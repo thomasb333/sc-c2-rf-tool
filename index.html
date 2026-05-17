@@ -1,0 +1,1639 @@
+<!--
+================================================================================
+  SC/C2 -- RF Spectrum, Antenna and Site Planning Tool  |  v5.1
+  Author  : BDT  |  github.com/thomasb333  |  MIT License 2026
+  No server. No install. Open in any modern browser.
+  In-browser codeplug parser: .cps .cpglog .cpg .data .img .json
+  Radios: CB HF VHF/UHF P25 DMR Marine Aviation GMRS Mesh HaLow Satellite
+  For informational/planning use only. Verify vs FCC license before TX.
+================================================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SC/C2 -- RF Spectrum and Site Planning Tool v5.1</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg0:#0d0e10;--bg1:#13151a;--bg2:#1a1d24;--bg3:#22262f;--bg4:#2a2f3a;
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.15);
+  --text0:#e8eaf0;--text1:#a8aab8;--text2:#6a6d7c;
+  --accent:#4fa3e0;--accent2:#2d7abf;
+  --green:#4ec994;--amber:#e8a840;--coral:#e06060;--purple:#9b7fe8;--teal:#3dc4b8;--pink:#d47aaa;
+  --mono:'JetBrains Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+  --r:6px;--r2:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg0);color:var(--text0);font-family:var(--sans);font-size:14px;min-height:100vh}
+.app{display:flex;flex-direction:column;min-height:100vh}
+
+/* topbar */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:50px;background:var(--bg1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.logo{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);letter-spacing:.04em}
+.page-title{font-size:12px;font-weight:400;color:var(--text2);margin-left:10px}
+.tab-btn{font-family:var(--sans);font-size:12px;font-weight:500;padding:5px 14px;border-radius:var(--r);border:1px solid var(--border2);background:transparent;color:var(--text1);cursor:pointer;transition:all .15s}
+.tab-btn:hover{background:var(--bg3);color:var(--text0)}
+.tab-btn.active{background:var(--accent2);border-color:var(--accent);color:#fff}
+.tabs{display:flex;gap:6px}
+
+.main{flex:1;padding:16px 20px;display:flex;flex-direction:column;gap:14px}
+
+/* panels */
+.panel{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden}
+.ph{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg2)}
+.pt{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--text1);text-transform:uppercase}
+.pb{padding:12px 14px}
+
+/* pills */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px 3px 7px;border-radius:99px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:all .15s;user-select:none;font-family:var(--sans)}
+.pill .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.pill.off{opacity:.28;filter:grayscale(.8)}
+.filter-row{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.flabel{font-family:var(--mono);font-size:10px;color:var(--text2);margin-right:4px;letter-spacing:.06em}
+
+/* canvas */
+#cvs{display:block;width:100%;cursor:crosshair}
+#cvs-wrap{position:relative;background:var(--bg0);border-radius:var(--r)}
+
+/* tooltip */
+#tt{position:absolute;display:none;pointer-events:none;width:280px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r2);padding:12px 14px;z-index:50;font-size:12px;line-height:1.5;color:var(--text0)}
+#tt .tt-name{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text0);margin-bottom:6px}
+#tt .tt-badges{display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap}
+#tt .badge{padding:2px 8px;border-radius:99px;font-size:10px;font-weight:500;font-family:var(--mono)}
+#tt .tt-grid{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:11px}
+#tt .tt-grid .k{color:var(--text2)}
+#tt .tt-grid .v{color:var(--text0);font-family:var(--mono);font-size:10px}
+#tt .tt-notes{margin-top:7px;padding-top:7px;border-top:1px solid var(--border);font-size:11px;color:var(--text1);line-height:1.5}
+#tt .tt-click{margin-top:5px;font-size:10px;color:var(--accent);font-family:var(--mono)}
+
+/* legend */
+.legend-row{display:flex;gap:12px;flex-wrap:wrap;font-size:11px}
+.leg{display:flex;align-items:center;gap:5px;color:var(--text2)}
+.leg-sw{width:18px;height:7px;border-radius:2px}
+
+/* ── loadout / site planner tab ── */
+.two-col{display:grid;grid-template-columns:300px 1fr;gap:14px}
+.sidebar-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:14px;display:flex;flex-direction:column;gap:10px}
+.sc-title{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+.user-row{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:var(--r);border:1px solid var(--border);background:var(--bg3);cursor:pointer;transition:all .15s}
+.user-row:hover{border-color:var(--border2);background:var(--bg4)}
+.user-row.selected{border-color:var(--accent);background:rgba(79,163,224,.08)}
+.user-row.cmp{border-color:var(--amber);background:rgba(232,168,64,.06)}
+.uname{font-size:13px;font-weight:500;color:var(--text0)}
+.urole{font-family:var(--mono);font-size:10px;color:var(--text2)}
+.ucnt{font-family:var(--mono);font-size:10px;color:var(--accent)}
+.btn{font-family:var(--sans);font-size:11px;font-weight:500;padding:4px 11px;border-radius:var(--r);border:1px solid var(--border2);background:transparent;color:var(--text1);cursor:pointer;transition:all .15s}
+.btn:hover{background:var(--bg4);color:var(--text0)}
+.btn.pr{background:var(--accent2);border-color:var(--accent);color:#fff}
+.btn.pr:hover{background:var(--accent)}
+.btn.dng{border-color:rgba(224,96,96,.4);color:var(--coral)}
+.btn.dng:hover{background:rgba(224,96,96,.1)}
+.btn.sm{padding:3px 8px;font-size:10px}
+.form-label{font-family:var(--mono);font-size:10px;color:var(--text2);margin-bottom:3px;display:block}
+input[type=text],input[type=number],select,textarea{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);color:var(--text0);font-family:var(--sans);font-size:12px;padding:6px 9px;outline:none;transition:border-color .15s}
+input[type=text]:focus,input[type=number]:focus,select:focus,textarea:focus{border-color:var(--accent)}
+select option{background:var(--bg3)}
+.hw-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:99px;background:var(--bg3);border:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--text1);cursor:pointer;transition:all .15s;margin:2px}
+.hw-chip.sel{background:rgba(79,163,224,.1);border-color:var(--accent);color:var(--accent)}
+
+/* radio cards */
+.rc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.rc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;transition:border-color .15s}
+.rc:hover{border-color:var(--border2)}
+.rc-hdr{padding:10px 12px 6px;display:flex;align-items:flex-start;justify-content:space-between}
+.rc-name{font-weight:600;font-size:13px;color:var(--text0);line-height:1.3}
+.rc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.rc-body{padding:0 12px 8px;display:flex;flex-direction:column;gap:3px}
+.rc-row{display:flex;justify-content:space-between;align-items:baseline}
+.rc-k{font-size:10px;color:var(--text2);font-family:var(--mono)}
+.rc-v{font-size:10px;color:var(--text1);font-family:var(--mono);text-align:right}
+.rc-edit{background:transparent;border:none;color:var(--text1);font-family:var(--mono);font-size:10px;text-align:right;cursor:text;padding:0;outline:none;width:140px;transition:background .1s,border-color .1s;border-bottom:1px solid transparent}
+.rc-edit:focus{background:var(--bg3);border-bottom-color:var(--accent);padding:0 3px}
+.rc-badges{display:flex;gap:4px;flex-wrap:wrap;padding:0 12px 6px}
+.rc-badge{padding:1px 7px;border-radius:99px;font-size:10px;font-weight:500;font-family:var(--mono)}
+.rc-footer{padding:7px 12px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:6px}
+.rc-freq{font-family:var(--mono);font-size:10px;color:var(--accent)}
+.plan-btn{font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:var(--r);border:1px solid rgba(79,163,224,.4);background:rgba(79,163,224,.08);color:var(--accent);cursor:pointer;text-decoration:none;transition:all .15s;display:inline-block}
+.plan-btn:hover{background:rgba(79,163,224,.18);border-color:var(--accent)}
+
+/* interop */
+.iop-table{width:100%;border-collapse:collapse;font-size:11px}
+.iop-table th{font-family:var(--mono);font-size:10px;color:var(--text2);text-align:left;padding:4px 7px;border-bottom:1px solid var(--border);font-weight:500}
+.iop-table td{padding:5px 7px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text1);vertical-align:top}
+.iop-table td:first-child{color:var(--text0);font-weight:500}
+.sdot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;vertical-align:middle}
+
+/* site planner panel */
+.sp-form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sp-form .full{grid-column:1/-1}
+.sp-section{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;margin-top:2px}
+.fspl-result{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:10px 14px;font-family:var(--mono);font-size:12px}
+.fspl-result .big{font-size:22px;font-weight:600;color:var(--green);margin-bottom:2px}
+.fspl-result .sub{font-size:10px;color:var(--text2)}
+.fspl-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:6px}
+.fspl-table th{font-family:var(--mono);font-size:10px;color:var(--text2);text-align:left;padding:3px 6px;border-bottom:1px solid var(--border)}
+.fspl-table td{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.03);color:var(--text1);font-family:var(--mono)}
+.fspl-table td.hl{color:var(--text0);font-weight:600}
+.link-big{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:var(--r2);border:1px solid var(--accent);background:rgba(79,163,224,.08);color:var(--accent);font-family:var(--mono);font-size:12px;font-weight:600;text-decoration:none;transition:all .15s;cursor:pointer}
+.link-big:hover{background:rgba(79,163,224,.18)}
+.link-big svg{width:14px;height:14px;flex-shrink:0}
+
+.empty{text-align:center;padding:36px 20px;color:var(--text2);font-size:13px}
+.empty .ei{font-size:28px;margin-bottom:8px;opacity:.35}
+.hidden{display:none!important}
+.row-btns{display:flex;gap:6px;flex-wrap:wrap}
+.divider{border:none;border-top:1px solid var(--border);margin:8px 0}
+.rl-chip{font-family:var(--mono);font-size:10px;padding:3px 10px;border-radius:99px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;transition:all .15s;margin:2px;display:inline-block}.rl-chip:hover{color:var(--text0);border-color:var(--accent)}.rl-chip.active{background:rgba(79,163,224,.12);border-color:var(--accent);color:var(--accent)}.rl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}.rl-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;cursor:pointer;transition:all .15s}.rl-card:hover{border-color:var(--border2)}.rl-card.rl-sel{border-color:var(--accent);background:rgba(79,163,224,.05)}.rl-hdr{padding:10px 12px 5px;display:flex;align-items:flex-start;justify-content:space-between}.rl-brand{font-family:var(--mono);font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}.rl-cname{font-weight:600;font-size:13px;color:var(--text0);line-height:1.3}.rl-body{padding:0 12px 8px;display:grid;grid-template-columns:1fr 1fr;gap:2px 8px}.rl-k{font-size:9px;color:var(--text2);font-family:var(--mono)}.rl-v{font-size:10px;color:var(--text1);font-family:var(--mono)}.rl-det{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r2);padding:14px;margin-top:12px;display:none}.rl-det.show{display:block}.dz{border:2px dashed rgba(79,163,224,.3);border-radius:var(--r2);padding:20px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(79,163,224,.03);margin-bottom:12px}.dz:hover,.dz.over{border-color:var(--accent);background:rgba(79,163,224,.08)}.ps-bar{display:none;padding:8px 12px;border-radius:var(--r);font-family:var(--mono);font-size:11px;margin-bottom:10px}
+</style>
+</head>
+<body>
+<div class="app">
+<div id="onboard-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg1);border:1px solid var(--border2);border-radius:14px;max-width:540px;width:100%;padding:28px">
+    <div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--accent);margin-bottom:3px">SC/C2</div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--text2);margin-bottom:18px">RF Spectrum &middot; Antenna &middot; Site Planning Tool &mdash; v5.1</div>
+    <div style="font-size:13px;color:var(--text1);line-height:1.7;margin-bottom:18px">A self-contained RF planning tool. No install, no server &mdash; open in any browser.</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">
+      <div style="display:flex;gap:12px;padding:10px 12px;background:var(--bg3);border-radius:var(--r2);border:1px solid var(--border)"><span style="font-family:var(--mono);font-size:10px;color:var(--accent);border:1px solid rgba(79,163,224,.3);border-radius:var(--r);padding:2px 7px;flex-shrink:0;line-height:1.6">1</span><span style="font-size:12px;color:var(--text1)"><strong style="color:var(--text0)">RF Spectrum</strong> &mdash; 80+ radios by frequency. Hover for specs, click for programming reference.</span></div>
+      <div style="display:flex;gap:12px;padding:10px 12px;background:var(--bg3);border-radius:var(--r2);border:1px solid var(--border)"><span style="font-family:var(--mono);font-size:10px;color:var(--accent);border:1px solid rgba(79,163,224,.3);border-radius:var(--r);padding:2px 7px;flex-shrink:0;line-height:1.6">2</span><span style="font-size:12px;color:var(--text1)"><strong style="color:var(--text0)">Radio Library</strong> &mdash; filter by brand, band, type. Select radios to assign to operators.</span></div>
+      <div style="display:flex;gap:12px;padding:10px 12px;background:var(--bg3);border-radius:var(--r2);border:1px solid var(--border)"><span style="font-family:var(--mono);font-size:10px;color:var(--accent);border:1px solid rgba(79,163,224,.3);border-radius:var(--r);padding:2px 7px;flex-shrink:0;line-height:1.6">3</span><span style="font-size:12px;color:var(--text1)"><strong style="color:var(--text0)">User Loadouts</strong> &mdash; add operators, assign radios, view interop matrix. Roster saves in this browser.</span></div>
+      <div style="display:flex;gap:12px;padding:10px 12px;background:var(--bg3);border-radius:var(--r2);border:1px solid var(--border)"><span style="font-family:var(--mono);font-size:10px;color:var(--accent);border:1px solid rgba(79,163,224,.3);border-radius:var(--r);padding:2px 7px;flex-shrink:0;line-height:1.6">4</span><span style="font-size:12px;color:var(--text1)"><strong style="color:var(--text0)">Codeplugs</strong> &mdash; drop .cps .cpglog .cpg .data .img .json to decode instantly. No Python needed.</span></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="document.getElementById('onboard-modal').style.display='none'" class="btn">Show Again Next Visit</button>
+      <button onclick="dismissOnboard()" class="btn pr">Get Started &#8599;</button>
+    </div>
+  </div>
+</div>
+
+
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:8px">
+    <span class="logo">SC/C2</span>
+    <span class="page-title">RF Spectrum · Antenna · Site Planning Tool — Rev 3.0 · March 2026</span>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('spectrum')">RF Spectrum</button>
+    <button class="tab-btn" onclick="showTab('radiolibrary')">Radio Library</button>
+    <button class="tab-btn" onclick="showTab('loadout')">User Loadouts</button>
+    <button class="tab-btn" onclick="showTab('siteplan')">Site Planner</button>
+    <button class="tab-btn" onclick="showTab('codeplug')">Codeplugs</button>
+    <button class="tab-btn" onclick="showTab('help')">? Help</button>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ══════════════ SPECTRUM TAB ══════════════ -->
+<div id="tab-spectrum">
+  <div class="panel">
+    <div class="ph">
+      <span class="pt">Band Type Filter</span>
+      <div class="legend-row" id="mod-legend"></div>
+    </div>
+    <div class="pb">
+      <div class="filter-row" id="filter-bar"><span class="flabel">TYPE</span></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="ph">
+      <span class="pt">RF Spectrum — 1.6 MHz → 6 GHz  (log-compressed zones)</span>
+      <span style="font-size:10px;color:var(--text2);font-family:var(--mono)">hover = full specs · click = programming prompt</span>
+    </div>
+    <div class="pb" style="padding:8px 12px">
+      <div id="cvs-wrap">
+        <canvas id="cvs" height="560"></canvas>
+        <div id="tt"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ LOADOUT TAB ══════════════ -->
+<div id="tab-loadout" class="hidden">
+  <div class="two-col">
+    <div>
+      <div class="sidebar-card">
+        <div>
+          <div class="sc-title">Personnel Roster</div>
+          <div id="user-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px"></div>
+          <div class="row-btns" style="margin-bottom:8px">
+            <button class="btn sm" onclick="viewSelected()">View</button>
+            <button class="btn sm" id="cmp-btn" onclick="toggleCompare()">Compare</button>
+            <button class="btn sm dng" onclick="deleteUser()">Remove</button>
+          </div>
+        </div>
+        <hr class="divider">
+        <div>
+          <div class="sc-title" style="margin-bottom:8px">Add Personnel</div>
+          <div style="margin-bottom:7px"><label class="form-label">CALLSIGN / NAME</label><input type="text" id="inp-name" placeholder="e.g. Alpha-1 / Smith"></div>
+          <div style="margin-bottom:7px"><label class="form-label">ROLE</label>
+            <select id="inp-role">
+              <option>Team Lead</option><option>Comms Operator</option><option>Field Technician</option>
+              <option>EOC Supervisor</option><option>Forward Observer</option><option>Logistics</option>
+            </select>
+          </div>
+          <div style="margin-bottom:8px"><label class="form-label">ASSIGN HARDWARE</label><div id="hw-assign" style="display:flex;flex-wrap:wrap;gap:2px;margin-top:4px"></div></div>
+          <button class="btn pr" style="width:100%" onclick="addUser()">+ Add to Roster</button>
+        </div>
+      </div>
+    </div>
+    <div id="loadout-display">
+      <div class="empty"><div class="ei">📡</div><div>Select a user to view their radio loadout</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ SITE PLANNER TAB ══════════════ -->
+<div id="tab-siteplan" class="hidden">
+  <div style="display:grid;grid-template-columns:360px 1fr;gap:14px">
+
+    <!-- LEFT: config form -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+
+      <!-- Radio selector -->
+      <div class="panel">
+        <div class="ph"><span class="pt">Radio Selection</span></div>
+        <div class="pb">
+          <label class="form-label">SELECT RADIO</label>
+          <select id="sp-radio-sel" onchange="spRadioChanged()">
+            <option value="">— select —</option>
+          </select>
+          <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:7px" id="sp-radio-params"></div>
+        </div>
+      </div>
+
+      <!-- Transmitter -->
+      <div class="panel">
+        <div class="ph"><span class="pt">Transmitter Site</span></div>
+        <div class="pb">
+          <div class="sp-section">Location</div>
+          <div class="sp-form">
+            <div><label class="form-label">SITE NAME</label><input type="text" id="sp-site-name" value="Site Alpha"></div>
+            <div><label class="form-label">LATITUDE (°)</label><input type="number" id="sp-lat" value="33.749" step="0.0001"></div>
+            <div><label class="form-label">LONGITUDE (°)</label><input type="number" id="sp-lon" value="-84.388" step="0.0001"></div>
+            <div><label class="form-label">ELEVATION AGL (m)</label><input type="number" id="sp-tx-height" value="10" min="1" max="500"></div>
+          </div>
+          <div class="sp-section" style="margin-top:10px">Transmitter RF</div>
+          <div class="sp-form">
+            <div><label class="form-label">FREQ (MHz)</label><input type="number" id="sp-freq" value="915" step="0.001"></div>
+            <div><label class="form-label">TX POWER (dBm)</label><input type="number" id="sp-txdbm" value="30" min="-10" max="50"></div>
+            <div><label class="form-label">TX ANT GAIN (dBi)</label><input type="number" id="sp-tx-gain" value="2.0" step="0.5"></div>
+            <div><label class="form-label">CABLE LOSS (dB)</label><input type="number" id="sp-cable" value="2.0" step="0.5"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Receiver -->
+      <div class="panel">
+        <div class="ph"><span class="pt">Receiver Parameters</span></div>
+        <div class="pb">
+          <div class="sp-form">
+            <div><label class="form-label">RX SENSITIVITY (dBm)</label><input type="number" id="sp-rx-sens" value="-130" min="-150" max="-50"></div>
+            <div><label class="form-label">RX HEIGHT AGL (m)</label><input type="number" id="sp-rx-height" value="1.5" step="0.5"></div>
+            <div><label class="form-label">RX ANT GAIN (dBi)</label><input type="number" id="sp-rx-gain" value="2.0" step="0.5"></div>
+            <div><label class="form-label">MAX RANGE (km)</label><input type="number" id="sp-range" value="20" min="1" max="100"></div>
+          </div>
+          <div class="sp-section" style="margin-top:10px">Propagation Model</div>
+          <div class="sp-form">
+            <div><label class="form-label">ENVIRONMENT</label>
+              <select id="sp-env">
+                <option value="rural">Rural / Open</option>
+                <option value="urban">Urban</option>
+                <option value="suburban">Suburban</option>
+                <option value="forest">Dense Forest</option>
+              </select>
+            </div>
+            <div><label class="form-label">CLUTTER HEIGHT (m)</label><input type="number" id="sp-clutter" value="0" min="0" max="40"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: outputs -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+
+      <!-- FSPL Calculator output -->
+      <div class="panel">
+        <div class="ph">
+          <span class="pt">Free Space Path Loss (FSPL) Calculator</span>
+          <button class="btn sm pr" onclick="calcFSPL()">Calculate</button>
+        </div>
+        <div class="pb">
+          <div id="fspl-out">
+            <div class="empty" style="padding:20px"><div class="ei" style="font-size:20px">📐</div><div>Configure parameters and click Calculate</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Site planner launch -->
+      <div class="panel">
+        <div class="ph"><span class="pt">Meshtastic Site Planner — Coverage Map</span></div>
+        <div class="pb">
+          <p style="font-size:12px;color:var(--text1);margin-bottom:12px;line-height:1.6">
+            The Meshtastic Site Planner uses the ITM/Longley-Rice terrain propagation model with NASA SRTM elevation data.
+            It accepts any frequency and power level — not just Meshtastic nodes — making it usable for all radios in this inventory.
+            The button below opens the planner pre-configured with your transmitter settings above.
+            <br><br>
+            <span style="color:var(--text2);font-size:11px;font-family:var(--mono)">Note: The site planner does not support URL parameter deep-linking; your config is shown below the button as copy-paste values to enter manually.</span>
+          </p>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start">
+            <a id="sp-launch-btn" href="https://site.meshtastic.org" target="_blank" class="link-big">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 3H3a1 1 0 00-1 1v9a1 1 0 001 1h9a1 1 0 001-1v-3M10 2h4m0 0v4m0-4L7 9"/></svg>
+              Open Site Planner
+            </a>
+            <button class="btn" onclick="copySpConfig()">Copy config to clipboard</button>
+          </div>
+
+          <div style="margin-top:14px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px" id="sp-config-display">
+            <div class="sp-section" style="margin-bottom:8px">Manual Entry Reference — site.meshtastic.org</div>
+            <table style="width:100%;border-collapse:collapse;font-size:11px">
+              <tbody id="sp-config-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- P2P Link Budget -->
+      <div class="panel">
+        <div class="ph">
+          <span class="pt">Point-to-Point Link Budget</span>
+          <span style="font-size:10px;color:var(--text2);font-family:var(--mono)">two-node margin analysis</span>
+        </div>
+        <div class="pb">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div>
+              <div class="sp-section">Node A (Transmitter above)</div>
+              <div style="font-size:11px;color:var(--text1);font-family:var(--mono)" id="lb-nodeA">—</div>
+            </div>
+            <div>
+              <div class="sp-section">Node B (Receiver)</div>
+              <div style="margin-bottom:5px"><label class="form-label">RX RADIO</label>
+                <select id="lb-rxradio" onchange="calcLinkBudget()">
+                  <option value="">— same as TX —</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div id="lb-out">
+            <div class="empty" style="padding:16px"><div style="font-size:11px;color:var(--text2)">Set parameters and click Calculate in the FSPL panel</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div><!-- /tab-siteplan -->
+
+
+<!-- ============ RADIO LIBRARY TAB ============ -->
+<div id="tab-radiolibrary" class="hidden">
+  <div class="panel">
+    <div class="ph"><span class="pt">Radio Equipment Library</span><span style="font-size:10px;color:var(--text2);font-family:var(--mono)">click card for detail &nbsp;|&nbsp; Select = add to loadout</span></div>
+    <div class="pb">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start">
+        <div><div class="flabel">BRAND</div><div id="rl-brand-f" style="display:flex;flex-wrap:wrap;max-width:600px"></div></div>
+        <div><div class="flabel">BAND</div><div id="rl-band-f" style="display:flex;flex-wrap:wrap"></div></div>
+        <div><div class="flabel">TYPE</div><div id="rl-type-f" style="display:flex;flex-wrap:wrap"></div></div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px"><input type="text" id="rl-srch" placeholder="Search..." style="width:180px" oninput="renderLib()"><span id="rl-cnt" style="font-family:var(--mono);font-size:10px;color:var(--text2)"></span></div>
+      </div>
+      <div id="rl-grid" class="rl-grid"></div>
+    </div>
+  </div>
+  <div id="rl-det" class="rl-det"></div>
+</div>
+
+<!-- ============ HELP TAB ============ -->
+<div id="tab-help" class="hidden">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel"><div class="ph"><span class="pt">Getting Started</span></div>
+        <div class="pb" style="font-size:12px;color:var(--text1);line-height:1.8">
+          <p style="margin-bottom:10px">SC/C2 is a self-contained RF planning tool. No install, no server &mdash; open in any browser.</p>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="display:flex;gap:10px"><span style="font-family:var(--mono);font-size:10px;color:var(--accent);border:1px solid rgba(79,163,224,.3);border-radius:var(--r);padding:1px 7px;flex-shrink:0;line-height:1.8">1</span><span><strong style="color:var(--text0)">RF Spectrum</strong> &mdash; 80+ radios by frequency. Hover for specs, click for programming reference. Filter by type.</span></div>
+            <div style="display:flex;gap:10px"><span style="font-family:var(--mono);font-size:10px;color:var(--accent);border:1px solid rgba(79,163,224,.3);border-radius:var(--r);padding:1px 7px;flex-shrink:0;line-height:1.8">2</span><span><strong style="color:var(--text0)">Radio Library</strong> &mdash; filter by brand, band, type. Select radios to assign to operators.</span></div>
+            <div style="display:flex;gap:10px"><span style="font-family:var(--mono);font-size:10px;color:var(--accent);border:1px solid rgba(79,163,224,.3);border-radius:var(--r);padding:1px 7px;flex-shrink:0;line-height:1.8">3</span><span><strong style="color:var(--text0)">User Loadouts</strong> &mdash; add operators, assign radios, view interop matrix. Roster saves automatically in this browser.</span></div>
+            <div style="display:flex;gap:10px"><span style="font-family:var(--mono);font-size:10px;color:var(--accent);border:1px solid rgba(79,163,224,.3);border-radius:var(--r);padding:1px 7px;flex-shrink:0;line-height:1.8">4</span><span><strong style="color:var(--text0)">Site Planner</strong> &mdash; select a radio to auto-load TX params, calculate FSPL and link budget.</span></div>
+            <div style="display:flex;gap:10px"><span style="font-family:var(--mono);font-size:10px;color:var(--accent);border:1px solid rgba(79,163,224,.3);border-radius:var(--r);padding:1px 7px;flex-shrink:0;line-height:1.8">5</span><span><strong style="color:var(--text0)">Codeplugs</strong> &mdash; drop a codeplug file to decode it in-browser. View channels, print field card, export JSON.</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel"><div class="ph"><span class="pt">Codeplug Parser &mdash; Formats</span></div>
+        <div class="pb">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead><tr style="background:var(--bg3);border-bottom:1px solid var(--border2)"><th style="font-family:var(--mono);font-size:10px;color:var(--text2);text-align:left;padding:5px 10px;font-weight:500">Ext</th><th style="font-family:var(--mono);font-size:10px;color:var(--text2);text-align:left;padding:5px 10px;font-weight:500">Format</th><th style="font-family:var(--mono);font-size:10px;color:var(--text2);text-align:left;padding:5px 10px;font-weight:500">Notes</th></tr></thead>
+            <tbody>
+              <tr style="border-bottom:1px solid rgba(255,255,255,.04)"><td style="padding:5px 10px;font-family:var(--mono);color:var(--accent)">.cps</td><td style="padding:5px 10px;color:var(--text0)">Motorola CPS XML</td><td style="padding:5px 10px;color:var(--text2);font-size:10px">XOR 0x95 &mdash; auto decoded</td></tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,.04)"><td style="padding:5px 10px;font-family:var(--mono);color:var(--accent)">.cpglog</td><td style="padding:5px 10px;color:var(--text0)">Motorola RSS log</td><td style="padding:5px 10px;color:var(--text2);font-size:10px">Companion to .cpg</td></tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,.04)"><td style="padding:5px 10px;font-family:var(--mono);color:var(--accent)">.cpg</td><td style="padding:5px 10px;color:var(--text0)">HT1250 binary</td><td style="padding:5px 10px;color:var(--text2);font-size:10px">Drop both .cpg and .cpglog together</td></tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,.04)"><td style="padding:5px 10px;font-family:var(--mono);color:var(--accent)">.data</td><td style="padding:5px 10px;color:var(--text0)">Baofeng DM-32UV</td><td style="padding:5px 10px;color:var(--text2);font-size:10px">IEEE 754 float32 binary</td></tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,.04)"><td style="padding:5px 10px;font-family:var(--mono);color:var(--accent)">.img</td><td style="padding:5px 10px;color:var(--text0)">CHIRPnext image</td><td style="padding:5px 10px;color:var(--text2);font-size:10px">Must be CSV export from CHIRP</td></tr>
+              <tr><td style="padding:5px 10px;font-family:var(--mono);color:var(--accent)">.json</td><td style="padding:5px 10px;color:var(--text0)">SC/C2 JSON</td><td style="padding:5px 10px;color:var(--text2);font-size:10px">Direct load or paste</td></tr>
+            </tbody>
+          </table>
+          <div style="margin-top:8px;padding:8px 12px;background:rgba(232,168,64,.06);border:1px solid rgba(232,168,64,.2);border-radius:var(--r);font-size:10px;color:var(--amber)">Need .rdt, .mdf, or .ctb? Use RF Codeplug Parser (.exe) to export SC/C2 JSON.</div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel"><div class="ph"><span class="pt">SC/C2 JSON Schema</span></div>
+        <div class="pb">
+          <pre style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px;font-family:var(--mono);font-size:10px;color:var(--text1);overflow-x:auto;line-height:1.6;white-space:pre-wrap">{
+  "radio":    "Radio Model",
+  "zone":     "Zone Name",
+  "parsed":   "YYYY-MM-DD",
+  "channels": [
+    { "num":1, "name":"DISPATCH", "band":"VHF",
+      "rx":155.145, "tx":153.845, "duplex":"-1.3000 MHz",
+      "tone_rx":"123.0", "tone_tx":"123.0",
+      "power":"High", "rx_only":"No", "notes":"..." }
+  ]
+}</pre>
+          <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:10px">
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:7px 10px"><div style="font-family:var(--mono);color:var(--text2);margin-bottom:2px">band</div><div style="color:var(--text1)">VHF / UHF / 700 / 800</div></div>
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:7px 10px"><div style="font-family:var(--mono);color:var(--text2);margin-bottom:2px">duplex</div><div style="color:var(--text1)">Simplex / +X.XXXX MHz / -X.XXXX MHz</div></div>
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:7px 10px"><div style="font-family:var(--mono);color:var(--text2);margin-bottom:2px">tone_rx/tx</div><div style="color:var(--text1)">Hz (127.3) / DCS (D023) / None</div></div>
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:7px 10px"><div style="font-family:var(--mono);color:var(--text2);margin-bottom:2px">rx_only</div><div style="color:var(--text1)">Yes / No</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel"><div class="ph"><span class="pt">Site Planner &mdash; How It Works</span></div>
+        <div class="pb" style="font-size:12px;color:var(--text1);line-height:1.7">
+          <p style="margin-bottom:8px">Uses <strong style="color:var(--text0)">Free Space Path Loss (FSPL)</strong> &mdash; ideal model, no terrain. Good for max theoretical range and sanity checks.</p>
+          <div style="font-family:var(--mono);font-size:10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px;color:var(--text2);line-height:2.1">FSPL = 20*log(d_km) + 20*log(f_MHz) + 32.44<br>EIRP = TX_Power + TX_Gain - Cable_Loss<br>Link_Budget = EIRP + RX_Gain - RX_Sensitivity</div>
+          <p style="margin-top:8px;font-size:11px">For terrain-corrected maps use <a href="https://site.meshtastic.org" target="_blank" style="color:var(--accent)">Meshtastic Site Planner</a> (ITM/Longley-Rice + SRTM). Site Planner tab shows config values for manual entry.</p>
+        </div>
+      </div>
+      <div class="panel"><div class="ph"><span class="pt">About</span></div>
+        <div class="pb" style="font-size:12px;color:var(--text1);line-height:1.8">
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin-bottom:12px">
+            <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">TOOL</span><span style="color:var(--text0);font-weight:500">SC/C2 RF Spectrum and Site Planning Tool</span>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">VERSION</span><span style="font-family:var(--mono);color:var(--accent)">5.1</span>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">AUTHOR</span><span>BDT</span>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">SOURCE</span><span><a href="https://github.com/thomasb333" target="_blank" style="color:var(--accent);text-decoration:none">github.com/thomasb333</a></span>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">LICENSE</span><span>MIT &mdash; free to use, modify, redistribute with attribution</span>
+          </div>
+          <div style="padding:8px 12px;background:rgba(232,168,64,.06);border:1px solid rgba(232,168,64,.2);border-radius:var(--r);font-size:10px;color:var(--amber)">For planning only. Verify frequencies against FCC license before TX. No liability assumed.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ CODEPLUG TAB ══════════════ -->
+<div id="tab-codeplug" class="hidden">
+
+  <div style="display:grid;grid-template-columns:320px 1fr;gap:14px">
+
+    <!-- LEFT: load & radio selector -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <div class="ph"><span class="pt">Load Codeplug</span><span style="font-family:var(--mono);font-size:10px;color:var(--green)">in-browser parser</span></div>
+        <div class="pb">
+          <div class="dz" id="cp-dz" onclick="cpBrowse()" ondragover="cpOver(event)" ondragleave="cpLeave()" ondrop="cpDrop(event)">
+            <div style="font-size:26px;margin-bottom:6px;opacity:.4">&#128194;</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:600;margin-bottom:3px">Drop file here or click to browse</div>
+            <div style="font-size:10px;color:var(--text2)">.cps &nbsp; .cpglog &nbsp; .cpg &nbsp; .data &nbsp; .img &nbsp; .json</div>
+          </div>
+          <input type="file" id="cp-file-input" accept=".cps,.cpglog,.cpg,.data,.img,.json" style="display:none">
+          <div class="ps-bar" id="cp-ps"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:10px;color:var(--text2)">or paste JSON</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
+          <textarea id="cp-paste" rows="5" style="font-family:var(--mono);font-size:10px;resize:vertical;margin-bottom:8px" placeholder="paste SC/C2 JSON here..."></textarea>
+          <div style="display:flex;gap:6px">
+            <button class="btn pr" style="flex:1" onclick="cpLoadPaste()">Load Pasted JSON</button>
+            <button class="btn" onclick="cpLoadDemo()">Load Demo</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="cp-info-panel" style="display:none">
+        <div class="ph"><span class="pt">Codeplug Info</span></div>
+        <div class="pb" id="cp-info-body"></div>
+      </div>
+
+      <div class="panel" id="cp-view-sel-panel" style="display:none">
+        <div class="ph"><span class="pt">View Mode</span></div>
+        <div class="pb">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button class="btn" id="cpv-channel"  onclick="cpSetView('channel')"  style="text-align:left">Channel Info Page</button>
+            <button class="btn" id="cpv-fieldcard" onclick="cpSetView('fieldcard')" style="text-align:left">Field Card (Print)</button>
+            <button class="btn" id="cpv-engineer" onclick="cpSetView('engineer')" style="text-align:left">Engineer View</button>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--border);margin:10px 0">
+          <button class="btn pr" style="width:100%" onclick="cpPrint()">Print / Save PDF</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: codeplug display -->
+    <div id="cp-display">
+      <div class="empty" style="padding:50px 20px">
+        <div class="ei">📋</div>
+        <div>Load a codeplug JSON to view channel programming</div>
+        <div style="font-size:11px;margin-top:6px;color:var(--text2)">Use the RF Codeplug Parser tool to decode .dat / .rdt / .img files → JSON</div>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /tab-codeplug -->
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// CODEPLUG TAB
+// ══════════════════════════════════════════════════════════════════
+let cpData = null;
+let cpView = 'channel';
+
+// Demo data built from our parsed kpg89dB.dat
+const CP_DEMO = {
+  radio: "Generic VHF Mobile -- Demo",
+  cps_version: "SC/C2 Demo v5.1",
+  zone: "Demo Zone Alpha",
+  parsed: new Date().toISOString().slice(0,10),
+  channels: [
+    {num:1,name:"CH 1 DISPATCH",  band:"VHF",rx:155.145,tx:153.845,duplex:"-1.3000 MHz",tone_rx:"123.0",tone_tx:"123.0",power:"High",rx_only:"No",notes:"Primary dispatch"},
+    {num:2,name:"CH 2 TAC 1",    band:"VHF",rx:154.025,tx:154.890,duplex:"+0.8650 MHz",tone_rx:"167.9",tone_tx:"167.9",power:"High",rx_only:"No",notes:"Tactical ch 1"},
+    {num:3,name:"CH 3 SIMPLEX",  band:"VHF",rx:155.895,tx:155.895,duplex:"Simplex",    tone_rx:"107.2",tone_tx:"107.2",power:"High",rx_only:"No",notes:"Car-to-car"},
+    {num:4,name:"CH 4 INTEROP",  band:"VHF",rx:155.340,tx:155.340,duplex:"Simplex",    tone_rx:"None", tone_tx:"None", power:"High",rx_only:"No",notes:"Interop channel"},
+    {num:5,name:"CH 5 MUTUAL",   band:"VHF",rx:151.138,tx:151.138,duplex:"Simplex",    tone_rx:"None", tone_tx:"None", power:"Low", rx_only:"No",notes:"Mutual aid"},
+  ]
+};
+
+function cpLoadDemo() {
+  cpData = CP_DEMO;
+  cpRender();
+}
+
+function cpLoadPaste() {
+  const txt = document.getElementById('cp-paste').value.trim();
+  if (!txt) { alert('Paste JSON first'); return; }
+  try {
+    cpData = JSON.parse(txt);
+    cpRender();
+  } catch(e) {
+    alert('Invalid JSON: ' + e.message);
+  }
+}
+
+// file input handled by cpParseFile() listener below
+
+function cpSetView(v) {
+  cpView = v;
+  ['channel','fieldcard','engineer'].forEach(id => {
+    document.getElementById('cpv-'+id).classList.toggle('pr', id===v);
+  });
+  if (cpData) cpRenderMain();
+}
+
+function cpRender() {
+  if (!cpData) return;
+  cpSetView(cpView);
+
+  // Info panel
+  const info = document.getElementById('cp-info-panel');
+  const body = document.getElementById('cp-info-body');
+  info.style.display = 'block';
+  document.getElementById('cp-view-sel-panel').style.display = 'block';
+
+  const ch = cpData.channels || [];
+  const vhf = ch.filter(c=>c.band==='VHF').length;
+  const uhf = ch.filter(c=>c.band==='UHF').length;
+  const rptr = ch.filter(c=>c.duplex && c.duplex!=='Simplex' && c.duplex!=='').length;
+  const ctcss = ch.filter(c=>c.tone_tx && c.tone_tx!=='None' && c.tone_tx!=='0').length;
+
+  body.innerHTML = `
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:11px">
+      <span style="color:var(--text2);font-family:var(--mono)">RADIO</span><span style="color:var(--text0);font-weight:500">${cpData.radio||'Unknown'}</span>
+      <span style="color:var(--text2);font-family:var(--mono)">CPS</span><span style="color:var(--text1);font-family:var(--mono);font-size:10px">${cpData.cps_version||'?'}</span>
+      <span style="color:var(--text2);font-family:var(--mono)">ZONE</span><span style="color:var(--accent);font-family:var(--mono);font-size:10px">${cpData.zone||'?'}</span>
+      <span style="color:var(--text2);font-family:var(--mono)">PARSED</span><span style="color:var(--text2);font-size:10px">${cpData.parsed||'?'}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px">
+      ${[['Total Ch',ch.length,'var(--accent)'],['VHF',vhf,'var(--teal)'],['UHF',uhf,'var(--purple)'],['Rptr',rptr,'var(--amber)'],['CTCSS',ctcss,'var(--green)'],['Simplex',ch.length-rptr,'var(--text2)']].map(([l,v,c])=>`
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:6px 8px">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text2)">${l}</div>
+        <div style="font-size:18px;font-weight:600;color:${c}">${v}</div>
+      </div>`).join('')}
+    </div>`;
+
+  cpRenderMain();
+}
+
+function cpRenderMain() {
+  const el = document.getElementById('cp-display');
+  if (!cpData) return;
+  const ch = cpData.channels || [];
+
+  if (cpView === 'channel') {
+    el.innerHTML = `
+      <div class="panel">
+        <div class="ph">
+          <span class="pt">Channel Info — ${cpData.radio||''} · ${cpData.zone||''}</span>
+          <span style="font-size:10px;color:var(--text2);font-family:var(--mono)">${ch.length} channels</span>
+        </div>
+        <div class="pb" style="padding:0;overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead>
+              <tr style="background:var(--bg3);border-bottom:1px solid var(--border2)">
+                ${['#','Name','Band','RX MHz','TX MHz','Duplex / Offset','RX CTCSS','TX CTCSS','Power','RX Only','Notes'].map(h=>`<th style="font-family:var(--mono);font-size:10px;color:var(--text2);text-align:left;padding:8px 10px;white-space:nowrap;font-weight:500">${h}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${ch.map((c,i)=>{
+                const bg = i%2===0?'background:var(--bg2)':'background:var(--bg1)';
+                const rptr = c.duplex && c.duplex!=='Simplex' && c.duplex!=='';
+                const duplexColor = rptr?'color:var(--amber)':'color:var(--green)';
+                return `<tr style="${bg};border-bottom:1px solid rgba(255,255,255,.03)">
+                  <td style="padding:7px 10px;font-family:var(--mono);font-size:10px;color:var(--text2)">${c.num}</td>
+                  <td style="padding:7px 10px;font-weight:600;color:var(--text0)">${c.name}</td>
+                  <td style="padding:7px 10px"><span style="font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:99px;background:${c.band==='VHF'?'rgba(61,196,184,.15)':'rgba(155,127,232,.15)'};color:${c.band==='VHF'?'var(--teal)':'var(--purple)'}">${c.band}</span></td>
+                  <td style="padding:7px 10px;font-family:var(--mono);font-size:10px;color:var(--accent)">${c.rx}</td>
+                  <td style="padding:7px 10px;font-family:var(--mono);font-size:10px;color:var(--text1)">${c.tx||'—'}</td>
+                  <td style="padding:7px 10px;font-family:var(--mono);font-size:10px;${duplexColor}">${c.duplex||'Simplex'}</td>
+                  <td style="padding:7px 10px;font-family:var(--mono);font-size:10px;color:var(--text2)">${c.tone_rx||'None'}</td>
+                  <td style="padding:7px 10px;font-family:var(--mono);font-size:10px;color:${c.tone_tx&&c.tone_tx!=='None'?'var(--green)':'var(--text2)'}">${c.tone_tx||'None'}</td>
+                  <td style="padding:7px 10px;font-family:var(--mono);font-size:10px;color:var(--text1)">${c.power||'—'}</td>
+                  <td style="padding:7px 10px;font-family:var(--mono);font-size:10px;color:${c.rx_only==='Yes'?'var(--amber)':'var(--text2)'}">${c.rx_only||'No'}</td>
+                  <td style="padding:7px 10px;font-size:10px;color:var(--text2)">${c.notes||''}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+
+  } else if (cpView === 'fieldcard') {
+    el.innerHTML = `
+      <div class="panel" id="cp-printable">
+        <div class="ph">
+          <span class="pt">Field Card — ${cpData.radio||''} · ${cpData.zone||''}</span>
+          <span style="font-size:10px;color:var(--text2);font-family:var(--mono)">optimised for print</span>
+        </div>
+        <div class="pb">
+          <div style="background:#fff;color:#000;border-radius:var(--r);padding:16px;font-family:'IBM Plex Sans',sans-serif" id="fc-inner">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #1F3864">
+              <div>
+                <div style="font-size:16px;font-weight:700;color:#1F3864">${cpData.radio||'Radio'}</div>
+                <div style="font-size:11px;color:#666;font-family:'JetBrains Mono',monospace">Zone: ${cpData.zone||''} · ${cpData.cps_version||''}</div>
+              </div>
+              <div style="font-size:10px;color:#999;font-family:'JetBrains Mono',monospace">Printed: ${new Date().toLocaleDateString()}</div>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead>
+                <tr style="background:#1F3864;color:#fff">
+                  ${['Ch#','Channel Name','RX MHz','TX MHz','Duplex','TX CTCSS','Pwr','Notes'].map(h=>`<th style="padding:6px 8px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600">${h}</th>`).join('')}
+                </tr>
+              </thead>
+              <tbody>
+                ${ch.map((c,i)=>{
+                  const bg = i%2===0?'#f8f9fa':'#ffffff';
+                  const rptr = c.duplex && c.duplex!=='Simplex' && c.duplex!=='';
+                  return `<tr style="background:${bg};border-bottom:1px solid #dee2e6">
+                    <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#666;text-align:right">${c.num}</td>
+                    <td style="padding:5px 8px;font-weight:700;font-size:13px;color:#1F3864">${c.name}</td>
+                    <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#185FA5">${c.rx}</td>
+                    <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#333">${c.tx||c.rx}</td>
+                    <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:${rptr?'#e8a840':'#2d7a40'};font-weight:600">${c.duplex||'Simplex'}</td>
+                    <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:${c.tone_tx&&c.tone_tx!=='None'?'#27ae60':'#999'}">${c.tone_tx||'None'}</td>
+                    <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#666">${c.power||'—'}</td>
+                    <td style="padding:5px 8px;font-size:10px;color:#888">${c.notes||''}</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+            <div style="margin-top:10px;font-size:9px;color:#999;font-family:'JetBrains Mono',monospace;border-top:1px solid #dee;padding-top:6px">
+              SC/C2 RF Codeplug Tool · ${cpData.radio||''} · Generated ${new Date().toISOString().slice(0,19).replace('T',' ')}
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+  } else if (cpView === 'engineer') {
+    el.innerHTML = `
+      <div class="panel">
+        <div class="ph">
+          <span class="pt">Engineer View — ${cpData.radio||''}</span>
+          <span style="font-size:10px;color:var(--amber);font-family:var(--mono)">full technical parameters</span>
+        </div>
+        <div class="pb" style="padding:0;overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead>
+              <tr style="background:var(--bg3);border-bottom:1px solid var(--border2)">
+                ${['#','Name','Band','RX Freq','TX Freq','Offset MHz','RX CTCSS Hz','TX CTCSS Hz','Power','Mode','RX Only','Duplex Dir'].map(h=>`<th style="font-family:var(--mono);font-size:9px;color:var(--amber);text-align:left;padding:7px 9px;white-space:nowrap;font-weight:500;border-right:1px solid var(--border)">${h}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${ch.map((c,i)=>{
+                const bg = i%2===0?'background:var(--bg2)':'background:var(--bg1)';
+                const offset = c.duplex==='Simplex'||!c.duplex?'0.0000':(parseFloat(c.tx)-parseFloat(c.rx)).toFixed(4);
+                const dir = c.duplex==='Simplex'?'—':parseFloat(c.tx)>parseFloat(c.rx)?'+':'-';
+                return `<tr style="${bg};border-bottom:1px solid rgba(255,255,255,.03)">
+                  <td style="padding:6px 9px;font-family:var(--mono);font-size:10px;color:var(--text2);border-right:1px solid var(--border)">${c.num}</td>
+                  <td style="padding:6px 9px;font-weight:600;color:var(--text0);border-right:1px solid var(--border)">${c.name}</td>
+                  <td style="padding:6px 9px;font-family:var(--mono);font-size:10px;color:var(--teal);border-right:1px solid var(--border)">${c.band}</td>
+                  <td style="padding:6px 9px;font-family:var(--mono);font-size:11px;color:var(--accent);border-right:1px solid var(--border)">${c.rx} MHz</td>
+                  <td style="padding:6px 9px;font-family:var(--mono);font-size:11px;color:var(--text1);border-right:1px solid var(--border)">${c.tx||c.rx} MHz</td>
+                  <td style="padding:6px 9px;font-family:var(--mono);font-size:10px;color:var(--amber);border-right:1px solid var(--border)">${offset}</td>
+                  <td style="padding:6px 9px;font-family:var(--mono);font-size:10px;color:var(--text2);border-right:1px solid var(--border)">${c.tone_rx||'None'}</td>
+                  <td style="padding:6px 9px;font-family:var(--mono);font-size:10px;color:${c.tone_tx&&c.tone_tx!=='None'?'var(--green)':'var(--text2)'};border-right:1px solid var(--border)">${c.tone_tx||'None'}</td>
+                  <td style="padding:6px 9px;font-family:var(--mono);font-size:10px;color:var(--text1);border-right:1px solid var(--border)">${c.power||'—'}</td>
+                  <td style="padding:6px 9px;font-family:var(--mono);font-size:10px;color:var(--text2);border-right:1px solid var(--border)">FM Analog</td>
+                  <td style="padding:6px 9px;font-family:var(--mono);font-size:10px;color:${c.rx_only==='Yes'?'var(--amber)':'var(--text2)'};border-right:1px solid var(--border)">${c.rx_only||'No'}</td>
+                  <td style="padding:6px 9px;font-family:var(--mono);font-size:10px;color:var(--text1)">${dir}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:12px">
+        <div class="ph"><span class="pt">Export JSON</span></div>
+        <div class="pb">
+          <button class="btn pr" onclick="cpExportJSON()">Download JSON</button>
+          <span style="font-size:11px;color:var(--text2);margin-left:10px">Save the canonical JSON for re-loading or sharing</span>
+        </div>
+      </div>`;
+  }
+}
+
+function cpPrint() {
+  if (cpView !== 'fieldcard') { cpSetView('fieldcard'); setTimeout(cpPrint, 200); return; }
+  const inner = document.getElementById('fc-inner');
+  if (!inner) return;
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>Field Card</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>body{margin:20px;font-family:'IBM Plex Sans',sans-serif}@media print{body{margin:0}}.rl-chip{font-family:var(--mono);font-size:10px;padding:3px 10px;border-radius:99px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;transition:all .15s;margin:2px;display:inline-block}.rl-chip:hover{color:var(--text0);border-color:var(--accent)}.rl-chip.active{background:rgba(79,163,224,.12);border-color:var(--accent);color:var(--accent)}.rl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}.rl-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;cursor:pointer;transition:all .15s}.rl-card:hover{border-color:var(--border2)}.rl-card.rl-sel{border-color:var(--accent);background:rgba(79,163,224,.05)}.rl-hdr{padding:10px 12px 5px;display:flex;align-items:flex-start;justify-content:space-between}.rl-brand{font-family:var(--mono);font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}.rl-cname{font-weight:600;font-size:13px;color:var(--text0);line-height:1.3}.rl-body{padding:0 12px 8px;display:grid;grid-template-columns:1fr 1fr;gap:2px 8px}.rl-k{font-size:9px;color:var(--text2);font-family:var(--mono)}.rl-v{font-size:10px;color:var(--text1);font-family:var(--mono)}.rl-det{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r2);padding:14px;margin-top:12px;display:none}.rl-det.show{display:block}.dz{border:2px dashed rgba(79,163,224,.3);border-radius:var(--r2);padding:20px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(79,163,224,.03);margin-bottom:12px}.dz:hover,.dz.over{border-color:var(--accent);background:rgba(79,163,224,.08)}.ps-bar{display:none;padding:8px 12px;border-radius:var(--r);font-family:var(--mono);font-size:11px;margin-bottom:10px}
+</style>
+    </head><body>${inner.outerHTML}</body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(()=>w.print(), 500);
+}
+
+function cpExportJSON() {
+  if (!cpData) return;
+  const blob = new Blob([JSON.stringify(cpData, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${(cpData.radio||'codeplug').replace(/\s+/g,'_')}_${cpData.zone||'zone'}.json`;
+  a.click();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// MASTER RADIO DATABASE  — with RX sensitivity, antenna type/gain
+// ══════════════════════════════════════════════════════════════════
+const RADIOS = [
+  // CB
+  {id:'cobra50',  name:'Cobra 50WX-ST',       type:'cb',     freqLo:26.965,freqHi:27.405,  wattage:'4W',       txDbm:36, mod:'AM/SSB',           modClass:'analog',  channels:'40 ch',       repeater:'No',
+   rxSens:-119, antennaType:'Mag-mount whip',   antennaGain:2.1,  antennaGainEditable:true,
+   notes:'CB Part 95; FCC-fixed 4W; dual watch; NOAA 10ch; SoundTracker NR; SWR meter', lane:0},
+  {id:'cobra29',  name:'Cobra 29 LTD',         type:'cb',     freqLo:26.965,freqHi:27.405,  wattage:'4W',       txDbm:36, mod:'AM/SSB',           modClass:'analog',  channels:'40 ch',       repeater:'No',
+   rxSens:-119, antennaType:'Roof-mount whip',  antennaGain:3.0,  antennaGainEditable:true,
+   notes:'CB Part 95; SWR cal; RF gain; delta tune; noise blanker; instant ch 9/19', lane:1},
+  // HF
+  {id:'barrett',  name:'Barrett 4050 HF SDR',  type:'hf',     freqLo:1.6,  freqHi:30,       wattage:'125W PEP', txDbm:51, mod:'USB/LSB/AM/ALE',   modClass:'analog',  channels:'1000 ch',     repeater:'No',
+   rxSens:-130, antennaType:'NVIS wire antenna',antennaGain:2.0,  antennaGainEditable:true,
+   notes:'Full HF SDR 1.6–30 MHz; ALE; digital voice option; IP connectivity; GPS support', lane:0},
+  // GMRS/FRS
+  {id:'motomr',   name:'Motorola MR350R',       type:'gmrs',   freqLo:462.5625,freqHi:467.725,wattage:'0.5–2W', txDbm:33, mod:'FM Analog',        modClass:'analog',  channels:'22+121 pvcy', repeater:'No',
+   rxSens:-116, antennaType:'Stubby helical (stock)', antennaGain:0.0, antennaGainEditable:true,
+   notes:'FRS/GMRS Part 95; NOAA 7ch; VibraCall; iVOX; ~35 mi LOS*', lane:0},
+  // VHF/UHF
+  {id:'tvt_v',    name:'TVT UV-390 VHF',        type:'vhf_uhf',freqLo:136,  freqHi:174,      wattage:'5W',       txDbm:37, mod:'FM Analog',        modClass:'analog',  channels:'128 ch',      repeater:'Yes',
+   rxSens:-122, antennaType:'Dual-band whip (stock)', antennaGain:2.15, antennaGainEditable:true,
+   notes:'Dual-band; CTCSS/DCS; VOX; FM RX 65–108 MHz; flashlight; CHIRP compatible', lane:0},
+  {id:'tvt_u',    name:'TVT UV-390 UHF',        type:'vhf_uhf',freqLo:400,  freqHi:520,      wattage:'5W',       txDbm:37, mod:'FM Analog',        modClass:'analog',  channels:'128 ch',      repeater:'Yes',
+   rxSens:-122, antennaType:'Dual-band whip (stock)', antennaGain:2.15, antennaGainEditable:true,
+   notes:'UHF band of TVT UV-390 (same unit); 400–520 MHz; CHIRP programmable', lane:1},
+  {id:'bfv',      name:'Baofeng UV-5R5 VHF',    type:'vhf_uhf',freqLo:136,  freqHi:174,      wattage:'4W/1W',    txDbm:36, mod:'FM Analog',        modClass:'analog',  channels:'128 ch',      repeater:'Yes',
+   rxSens:-122, antennaType:'Dual-band whip (stock)', antennaGain:2.15, antennaGainEditable:true,
+   notes:'Dual-band; 4W/1W selectable; CTCSS/DCS; VOX; squelch; CHIRP compatible', lane:2},
+  {id:'bfu',      name:'Baofeng UV-5R5 UHF',    type:'vhf_uhf',freqLo:400,  freqHi:520,      wattage:'4W/1W',    txDbm:36, mod:'FM Analog',        modClass:'analog',  channels:'128 ch',      repeater:'Yes',
+   rxSens:-122, antennaType:'Dual-band whip (stock)', antennaGain:2.15, antennaGainEditable:true,
+   notes:'UHF band of UV-5R5 (same unit); programmable via CHIRP', lane:3},
+  {id:'bfp_v',    name:'BF-F8HP Pro VHF',       type:'vhf_uhf',freqLo:144,  freqHi:148,      wattage:'8W',       txDbm:39, mod:'FM Analog',        modClass:'analog',  channels:'1000 ch',     repeater:'Yes',
+   rxSens:-122, antennaType:'Tri-band whip (stock)', antennaGain:2.15, antennaGainEditable:true,
+   notes:'Tri-band ham; TX 144–148 MHz; 8W; GPS; NOAA; IP54; USB-C; CHIRP; FW upgradeable', lane:4},
+  {id:'bfp_125',  name:'BF-F8HP Pro 1.25M',     type:'vhf_uhf',freqLo:222,  freqHi:225,      wattage:'5W',       txDbm:37, mod:'FM Analog',        modClass:'analog',  channels:'1000 ch',     repeater:'Yes',
+   rxSens:-122, antennaType:'Tri-band whip (stock)', antennaGain:2.15, antennaGainEditable:true,
+   notes:'1.25M TX 222–225 MHz; 5W; amateur band; same hardware as BF-F8HP Pro', lane:5},
+  {id:'bfp_u',    name:'BF-F8HP Pro UHF',       type:'vhf_uhf',freqLo:420,  freqHi:450,      wattage:'8W',       txDbm:39, mod:'FM Analog',        modClass:'analog',  channels:'1000 ch',     repeater:'Yes',
+   rxSens:-122, antennaType:'Tri-band whip (stock)', antennaGain:2.15, antennaGainEditable:true,
+   notes:'UHF TX 420–450 MHz; aviation RX 108–136 MHz (RX only)', lane:6},
+  {id:'cdm_v',    name:'Motorola CDM-1250 VHF',  type:'vhf_uhf',freqLo:136, freqHi:174,      wattage:'25W',      txDbm:44, mod:'FM/MDC1200',        modClass:'hybrid',  channels:'64 ch',       repeater:'Yes',
+   rxSens:-120, antennaType:'Mobile NMO whip',   antennaGain:3.0,  antennaGainEditable:true,
+   notes:'VHF mobile; MDC1200; CTCSS/DCS; emergency btn; Part 90; programmed via RSS', lane:7},
+  {id:'cdm_u',    name:'Motorola CDM-1250 UHF',  type:'vhf_uhf',freqLo:403, freqHi:470,      wattage:'25W',      txDbm:44, mod:'FM/MDC1200',        modClass:'hybrid',  channels:'64 ch',       repeater:'Yes',
+   rxSens:-120, antennaType:'Mobile NMO whip',   antennaGain:3.0,  antennaGainEditable:true,
+   notes:'UHF 403–470 MHz; MDC1200 signaling; same capabilities as VHF model', lane:8},
+  {id:'tk7180',   name:'Kenwood TK-7180',         type:'vhf_uhf',freqLo:136, freqHi:174,      wattage:'1–30W',    txDbm:45, mod:'FM/FleetSync',      modClass:'hybrid',  channels:'512 ch/128z', repeater:'Yes',
+   rxSens:-121, antennaType:'Mobile NMO whip',   antennaGain:3.0,  antennaGainEditable:true,
+   notes:'VHF mobile; MIL-STD-810 C/D/E/F; IP-54/55; FleetSync II; voice inversion; LTR trunking', lane:9},
+  // P25
+  {id:'xtl_v',    name:'XTL2500 VHF',            type:'p25',    freqLo:136,  freqHi:174,      wattage:'110W',     txDbm:51, mod:'P25 Ph.1/FM',      modClass:'digital', channels:'512 ch',      repeater:'Yes (DVRS)',
+   rxSens:-119, antennaType:'Mobile NMO whip',   antennaGain:3.0,  antennaGainEditable:true,
+   notes:'APCO P25 Ph.1 mobile; AES-256/DES/ADP; FLASHport; MIL-STD-810; 110W VHF', lane:10},
+  {id:'xtl_u',    name:'XTL2500 UHF',            type:'p25',    freqLo:380,  freqHi:520,      wattage:'110W',     txDbm:51, mod:'P25 Ph.1/FM',      modClass:'digital', channels:'512 ch',      repeater:'Yes (DVRS)',
+   rxSens:-119, antennaType:'Mobile NMO whip',   antennaGain:3.0,  antennaGainEditable:true,
+   notes:'UHF 380–520 MHz; P25 + analog; AES-256; pairs with DVRS for vehicular relay', lane:11},
+  {id:'xtl_800',  name:'XTL2500 700/800 MHz',    type:'p25',    freqLo:764,  freqHi:870,      wattage:'35W',      txDbm:45, mod:'P25 Ph.1/FM',      modClass:'digital', channels:'512 ch',      repeater:'Yes (DVRS)',
+   rxSens:-118, antennaType:'Mobile NMO 800MHz', antennaGain:3.0,  antennaGainEditable:true,
+   notes:'700/800 MHz public safety; 35W; P25 Ph.1; FirstNet compatible', lane:12},
+  {id:'xts_v',    name:'XTS2500 VHF Portable',   type:'p25',    freqLo:136,  freqHi:174,      wattage:'5W',       txDbm:37, mod:'P25 Ph.1/FM',      modClass:'digital', channels:'870 ch',      repeater:'Yes (trunked)',
+   rxSens:-118, antennaType:'Portable stubby whip', antennaGain:2.0, antennaGainEditable:true,
+   notes:'APCO P25 portable; AES-256/DES/ADP; FLASHport; MIL-STD-810; 6-line display; 11.0 oz', lane:13},
+  {id:'xts_u',    name:'XTS2500 UHF Portable',   type:'p25',    freqLo:403,  freqHi:470,      wattage:'5W',       txDbm:37, mod:'P25 Ph.1/FM',      modClass:'digital', channels:'870 ch',      repeater:'Yes (trunked)',
+   rxSens:-118, antennaType:'Portable stubby whip', antennaGain:2.0, antennaGainEditable:true,
+   notes:'UHF 403–470 MHz; full P25 Ph.1; IP enabled; pairs with XTL2500 for DVRS relay', lane:14},
+  {id:'xts_800',  name:'XTS2500 700/800 MHz',    type:'p25',    freqLo:764,  freqHi:870,      wattage:'1–3W',     txDbm:35, mod:'P25 Ph.1/FM',      modClass:'digital', channels:'870 ch',      repeater:'Yes (trunked)',
+   rxSens:-116, antennaType:'Portable 800MHz whip', antennaGain:2.0, antennaGainEditable:true,
+   notes:'700/800 MHz portable; 1–3W; P25; IP enabled; relay via XTL2500 DVRS', lane:15},
+  // Marine
+  {id:'icom',     name:'Icom IC-M330 Marine',    type:'marine', freqLo:156.025,freqHi:162.025,wattage:'25W/1W',  txDbm:44, mod:'FM/DSC',           modClass:'hybrid',  channels:'88 ch',       repeater:'No',
+   rxSens:-117, antennaType:'Marine VHF collinear', antennaGain:3.0, antennaGainEditable:true,
+   notes:'Marine VHF; DSC Class D; NOAA weather; waterproof IPX7; dual/tri-watch; AIS option', lane:0},
+  // Meshtastic
+  {id:'mesh_433', name:'Meshtastic 433 MHz',     type:'mesh',   freqLo:433.0, freqHi:434.8,   wattage:'0.1–1W',  txDbm:30, mod:'LoRa/FSK',         modClass:'mesh',    channels:'Mesh auto',   repeater:'Self (relay)',
+   rxSens:-148, antennaType:'1/4-wave whip 433MHz', antennaGain:2.0, antennaGainEditable:true,
+   notes:'ISM 433 MHz LoRa; EU/Region 2; ~5km LOS; AES-128; BLE config; off-grid text/GPS relay', lane:0},
+  {id:'mesh_915', name:'Meshtastic 915 MHz',     type:'mesh',   freqLo:902,   freqHi:928,     wattage:'0.1–1W',  txDbm:30, mod:'LoRa/FSK',         modClass:'mesh',    channels:'Mesh auto',   repeater:'Self (relay)',
+   rxSens:-148, antennaType:'915MHz LoRa antenna', antennaGain:2.0,  antennaGainEditable:true,
+   notes:'ISM 915 MHz LoRa; US Region 1; ~10–15km LOS; AES-128; BLE/WiFi config; store-forward', lane:1},
+  {id:'mesh_2400',name:'Meshtastic 2.4 GHz',     type:'mesh',   freqLo:2400,  freqHi:2500,    wattage:'0.1W',    txDbm:20, mod:'LoRa 2.4GHz',      modClass:'mesh',    channels:'Mesh auto',   repeater:'Self (relay)',
+   rxSens:-136, antennaType:'2.4GHz dipole',     antennaGain:2.15, antennaGainEditable:true,
+   notes:'2.4 GHz LoRa; ~1–3km; higher data rate; AES-128; RF-congested env.', lane:2},
+  // HaLow
+  {id:'halow_900',name:'HaLow Wi-Fi 900 MHz',    type:'halow',  freqLo:863,   freqHi:928,     wattage:'0.1–1W',  txDbm:23, mod:'OFDM 802.11ah',    modClass:'halow',   channels:'51 ch (1MHz)' ,repeater:'Yes (AP/extender)',
+   rxSens:-100, antennaType:'Omnidirectional 900MHz', antennaGain:5.0, antennaGainEditable:true,
+   notes:'IEEE 802.11ah sub-GHz Wi-Fi; ~1km; 150kbps–86Mbps; IP-native; WPA3; sensors/cameras', lane:3},
+];
+
+// per-radio antenna gains: editable at runtime
+const antennaOverrides = {}; // id -> {type, gain}
+function getAntennaType(r){ return antennaOverrides[r.id]?.type ?? r.antennaType; }
+function getAntennaGain(r){ return antennaOverrides[r.id]?.gain ?? r.antennaGain; }
+
+const TYPES={
+  cb:      {label:'CB 27 MHz',       color:'#888780'},
+  hf:      {label:'HF 1.6–30 MHz',   color:'#d47aaa'},
+  gmrs:    {label:'FRS/GMRS',        color:'#4ec994'},
+  vhf_uhf: {label:'VHF/UHF Conv.',   color:'#3dc4b8'},
+  p25:     {label:'P25 Digital',     color:'#4fa3e0'},
+  marine:  {label:'Marine VHF',      color:'#9b7fe8'},
+  mesh:    {label:'Mesh/LoRa',       color:'#e8a840'},
+  halow:   {label:'HaLow 802.11ah',  color:'#e06060'},
+};
+const MOD_COLORS={analog:'#3dc4b8',digital:'#4fa3e0',hybrid:'#e8a840',mesh:'#e8a840',halow:'#e06060'};
+
+// Zones
+const ZONES=[
+  {lo:1,   hi:30,   label:'HF 1–30 MHz'},
+  {lo:30,  hi:108,  label:'VHF low'},
+  {lo:108, hi:174,  label:'VHF 108–174'},
+  {lo:174, hi:462,  label:'UHF 174–462'},
+  {lo:462, hi:520,  label:'UHF 462–520'},
+  {lo:520, hi:764,  label:'700 520–764'},
+  {lo:764, hi:930,  label:'800/900'},
+  {lo:930, hi:2500, label:'ISM–2.5G'},
+  {lo:2500,hi:6000, label:'5GHz+'},
+];
+const ZW=[0.10,0.06,0.10,0.10,0.08,0.07,0.12,0.18,0.07];
+const ZS=ZW.reduce((a,b)=>a+b,0);
+const ZN=ZW.map(w=>w/ZS);
+
+function mhzToFrac(f){
+  let acc=0;
+  for(let i=0;i<ZONES.length;i++){
+    const z=ZONES[i];
+    if(f<=z.lo) return acc;
+    if(f>=z.hi){acc+=ZN[i];continue;}
+    return acc+((f-z.lo)/(z.hi-z.lo))*ZN[i];
+  }
+  return 1;
+}
+
+// ── STATE ────────────────────────────────────────────────────────
+let activeTypes=new Set(Object.keys(TYPES));
+let hoveredId=null;
+let bandRects={};
+
+// ── TABS ─────────────────────────────────────────────────────────
+function showTab(t){
+  ['spectrum','loadout','siteplan','codeplug'].forEach(id=>{
+    document.getElementById('tab-'+id).classList.toggle('hidden',id!==t);
+  });
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>{
+    b.classList.toggle('active',['spectrum','loadout','siteplan','codeplug'][i]===t);
+  });
+  if(t==='spectrum') setTimeout(draw,50);
+  if(t==='loadout'){renderUserList();renderLoadoutDisplay();}
+  if(t==='siteplan'){buildSpRadioSel();updateSpConfigDisplay();}
+}
+
+// ── FILTER PILLS ─────────────────────────────────────────────────
+(function(){
+  const bar=document.getElementById('filter-bar');
+  Object.entries(TYPES).forEach(([k,v])=>{
+    const p=document.createElement('span');
+    p.className='pill';
+    p.style.color=v.color;
+    p.style.background='rgba(255,255,255,.04)';
+    p.style.borderColor=v.color+'55';
+    p.innerHTML=`<span class="dot" style="background:${v.color}"></span>${v.label}`;
+    p.onclick=()=>{
+      if(activeTypes.has(k)){activeTypes.delete(k);p.classList.add('off');}
+      else{activeTypes.add(k);p.classList.remove('off');}
+      draw();
+    };
+    bar.appendChild(p);
+  });
+  const leg=document.getElementById('mod-legend');
+  [{c:MOD_COLORS.analog,l:'Analog'},{c:MOD_COLORS.digital,l:'Digital P25'},{c:MOD_COLORS.hybrid,l:'Hybrid'},{c:MOD_COLORS.mesh,l:'LoRa Mesh'},{c:MOD_COLORS.halow,l:'HaLow'}].forEach(x=>{
+    const d=document.createElement('div');d.className='leg';
+    d.innerHTML=`<span class="leg-sw" style="background:${x.c}"></span>${x.l}`;
+    leg.appendChild(d);
+  });
+})();
+
+// ── SPECTRUM CANVAS ───────────────────────────────────────────────
+const C=document.getElementById('cvs');
+const ctx=C.getContext('2d');
+const TT=document.getElementById('tt');
+
+function draw(){
+  if(document.getElementById('tab-spectrum').classList.contains('hidden')) return;
+  const DPR=window.devicePixelRatio||1;
+  const W=C.parentElement.clientWidth;
+  const H=560;
+  C.width=W*DPR;C.height=H*DPR;C.style.width=W+'px';C.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.clearRect(0,0,W,H);
+  const M={top:22,right:12,bottom:52,left:12};
+  const cw=W-M.left-M.right,ch=H-M.top-M.bottom;
+  ctx.fillStyle='#0d0e10';ctx.fillRect(0,0,W,H);
+
+  let zx=M.left;
+  ZONES.forEach((z,i)=>{
+    const zw=ZN[i]*cw;
+    ctx.fillStyle=i%2===0?'rgba(255,255,255,.013)':'rgba(255,255,255,.006)';
+    ctx.fillRect(zx,M.top,zw,ch);
+    ctx.strokeStyle='rgba(255,255,255,.06)';ctx.lineWidth=0.5;ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(zx,M.top);ctx.lineTo(zx,M.top+ch);ctx.stroke();
+    ctx.fillStyle='#555870';ctx.font=`500 9px var(--mono)`;ctx.textAlign='center';
+    ctx.fillText(z.label,zx+zw/2,M.top+11);
+    zx+=zw;
+  });
+
+  const TICKS=[1.6,10,27.4,50,108,136,148,162,174,222,380,420,462,468,520,764,868,915,928,2400,5800];
+  ctx.font=`400 8px var(--mono)`;ctx.textAlign='center';
+  TICKS.forEach(f=>{
+    const x=M.left+mhzToFrac(f)*cw;
+    ctx.strokeStyle='rgba(255,255,255,.07)';ctx.lineWidth=0.5;ctx.setLineDash([2,3]);
+    ctx.beginPath();ctx.moveTo(x,M.top+15);ctx.lineTo(x,M.top+ch);ctx.stroke();
+    ctx.setLineDash([]);ctx.fillStyle='#444657';
+    const lbl=f>=1000?(f/1000).toFixed(1)+'G':f+'M';
+    ctx.fillText(lbl,x,H-M.bottom+11);
+  });
+
+  const vis=RADIOS.filter(r=>activeTypes.has(r.type));
+  const BH=20,LP=3,startY=M.top+18;
+  bandRects={};
+  vis.forEach(r=>{
+    const tc=TYPES[r.type],mc=MOD_COLORS[r.modClass];
+    const x=M.left+mhzToFrac(r.freqLo)*cw;
+    const x2=M.left+mhzToFrac(r.freqHi)*cw;
+    const bw=Math.max(x2-x,5),y=startY+r.lane*(BH+LP),bh=BH;
+    const isHov=hoveredId===r.id;
+    ctx.globalAlpha=isHov?0.95:0.65;
+    ctx.fillStyle=mc;
+    ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,bw,bh,3);else ctx.rect(x,y,bw,bh);ctx.fill();
+    ctx.globalAlpha=1;
+    ctx.strokeStyle=isHov?tc.color:'rgba(255,255,255,.14)';ctx.lineWidth=isHov?1.5:0.5;
+    ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,bw,bh,3);else ctx.rect(x,y,bw,bh);ctx.stroke();
+    ctx.font=`500 9px var(--mono)`;ctx.fillStyle='rgba(255,255,255,.88)';ctx.textAlign='left';
+    const short=r.name.replace(/ VHF| UHF| 700\/800 MHz| 1\.25M| 915 MHz| 433 MHz| 2\.4 GHz| 900 MHz/g,'');
+    const tw=ctx.measureText(short).width;
+    if(bw>tw+8)ctx.fillText(short,x+4,y+bh/2+3);
+    else if(bw>14)ctx.fillText(short.split(' ').map(w=>w[0]).join('').slice(0,5),x+3,y+bh/2+3);
+    bandRects[r.id]={x,y,w:bw,h:bh,radio:r};
+  });
+  ctx.globalAlpha=1;
+
+  // interop lines
+  [['tvt_v','cdm_v'],['tvt_v','tk7180'],['tvt_v','xtl_v'],['tvt_v','xts_v'],['tvt_v','bfv'],
+   ['cdm_v','tk7180'],['xtl_v','xts_v'],['bfv','cdm_v'],['bfv','tk7180'],
+   ['cdm_u','xtl_u'],['xtl_u','xts_u'],['tvt_u','cdm_u'],['tvt_u','xtl_u'],['bfp_u','tvt_u']
+  ].forEach(([a,b])=>{
+    const ra=bandRects[a],rb=bandRects[b];if(!ra||!rb)return;
+    const ox1=Math.max(ra.x,rb.x),ox2=Math.min(ra.x+ra.w,rb.x+rb.w);if(ox2<=ox1)return;
+    const mx=(ox1+ox2)/2;
+    ctx.strokeStyle='rgba(255,255,255,.09)';ctx.lineWidth=0.8;ctx.setLineDash([2,2]);
+    ctx.beginPath();ctx.moveTo(mx,ra.y+ra.h);ctx.lineTo(mx,rb.y);ctx.stroke();ctx.setLineDash([]);
+  });
+}
+
+function getHit(ex,ey){for(const[id,r]of Object.entries(bandRects)){if(ex>=r.x&&ex<=r.x+r.w&&ey>=r.y&&ey<=r.y+r.h)return id;}return null;}
+
+C.addEventListener('mousemove',e=>{
+  const rect=C.getBoundingClientRect();
+  const ex=e.clientX-rect.left,ey=e.clientY-rect.top;
+  const hit=getHit(ex,ey);
+  if(hit!==hoveredId){hoveredId=hit;draw();}
+  if(hit){
+    const r=bandRects[hit].radio,tc=TYPES[r.type],mc=MOD_COLORS[r.modClass];
+    const gain=getAntennaGain(r),antType=getAntennaType(r);
+    const modLabel={analog:'Analog',digital:'Digital P25',hybrid:'Hybrid A/D',mesh:'LoRa Mesh',halow:'802.11ah HaLow'}[r.modClass]||r.modClass;
+    TT.innerHTML=`
+      <div class="tt-name">${r.name}</div>
+      <div class="tt-badges">
+        <span class="badge" style="background:${mc}22;color:${mc};border:1px solid ${mc}55">${modLabel}</span>
+        <span class="badge" style="background:${tc.color}22;color:${tc.color};border:1px solid ${tc.color}55">${tc.label}</span>
+      </div>
+      <div class="tt-grid">
+        <span class="k">Freq</span><span class="v">${r.freqLo}–${r.freqHi} MHz</span>
+        <span class="k">TX Power</span><span class="v">${r.wattage} (${r.txDbm} dBm)</span>
+        <span class="k">Modulation</span><span class="v">${r.mod}</span>
+        <span class="k">Channels</span><span class="v">${r.channels}</span>
+        <span class="k">Repeater</span><span class="v">${r.repeater}</span>
+        <span class="k">RX Sensitivity</span><span class="v" style="color:#4ec994">${r.rxSens} dBm</span>
+        <span class="k">Antenna Type</span><span class="v">${antType}</span>
+        <span class="k">Antenna Gain</span><span class="v">${gain.toFixed(1)} dBi</span>
+      </div>
+      <div class="tt-notes">${r.notes}</div>
+      <div class="tt-click">↗ click for programming prompt</div>`;
+    TT.style.display='block';
+    const W2=C.getBoundingClientRect().width;
+    let lx=ex+16,ly=ey-70;
+    if(lx+285>W2-8)lx=ex-299;if(ly<4)ly=4;
+    TT.style.left=lx+'px';TT.style.top=ly+'px';
+  }else{TT.style.display='none';}
+});
+C.addEventListener('mouseleave',()=>{hoveredId=null;TT.style.display='none';draw();});
+C.addEventListener('click',e=>{
+  const rect=C.getBoundingClientRect();
+  const hit=getHit(e.clientX-rect.left,e.clientY-rect.top);
+  if(hit){const r=bandRects[hit].radio;alert(`Programming reference for: ${r.name}\n\nFreq: ${r.freqLo}–${r.freqHi} MHz\nMod: ${r.mod}\nTX: ${r.wattage} (${r.txDbm} dBm)\nRX Sensitivity: ${r.rxSens} dBm\nAntenna: ${getAntennaType(r)} @ ${getAntennaGain(r).toFixed(1)} dBi\nChannels: ${r.channels}\nRepeater: ${r.repeater}\n\n${r.notes}`);}
+});
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(draw,80);});
+draw();
+
+// ══════════════════════════════════════════════════════════════════
+// LOADOUT
+// ══════════════════════════════════════════════════════════════════
+function _loadU(){try{return JSON.parse(localStorage.getItem('sc_c2_u5')||'[]');}catch(e){return[];}}
+function _saveU(){try{localStorage.setItem('sc_c2_u5',JSON.stringify(users));}catch(e){}}
+let users=_loadU();
+let selectedUserId=null,compareMode=false,compareUserIds=new Set(),hwSel=new Set();
+
+function uid(){return 'u'+Date.now().toString(36);}
+function radioById(id){return RADIOS.find(r=>r.id===id);}
+
+function buildHwAssign(){
+  const w=document.getElementById('hw-assign');w.innerHTML='';
+  RADIOS.forEach(r=>{
+    const c=document.createElement('span');
+    c.className='hw-chip'+(hwSel.has(r.id)?' sel':'');
+    c.textContent=r.name;
+    c.onclick=()=>{hwSel.has(r.id)?hwSel.delete(r.id):hwSel.add(r.id);buildHwAssign();};
+    w.appendChild(c);
+  });
+}
+buildHwAssign();
+
+function addUser(){
+  const name=document.getElementById('inp-name').value.trim();
+  const role=document.getElementById('inp-role').value;
+  if(!name){document.getElementById('inp-name').focus();return;}
+  users.push({id:uid(),name,role,radios:[...hwSel]});_saveU();
+  hwSel.clear();document.getElementById('inp-name').value='';
+  buildHwAssign();renderUserList();renderLoadoutDisplay();
+}
+function deleteUser(){
+  if(!selectedUserId)return;
+  users=users.filter(u=>u.id!==selectedUserId);_saveU();
+  compareUserIds.delete(selectedUserId);selectedUserId=null;
+  renderUserList();renderLoadoutDisplay();
+}
+function viewSelected(){compareMode=false;renderLoadoutDisplay();}
+function toggleCompare(){
+  compareMode=!compareMode;
+  document.getElementById('cmp-btn').classList.toggle('pr',compareMode);
+  if(!compareMode)compareUserIds.clear();
+  renderUserList();renderLoadoutDisplay();
+}
+
+function renderUserList(){
+  const el=document.getElementById('user-list');el.innerHTML='';
+  users.forEach(u=>{
+    const row=document.createElement('div');
+    row.className='user-row'+(selectedUserId===u.id?' selected':'')+(compareMode&&compareUserIds.has(u.id)?' cmp':'');
+    row.innerHTML=`<div><div class="uname">${u.name}</div><div class="urole">${u.role}</div></div><span class="ucnt">${u.radios.length} radio${u.radios.length!==1?'s':''}</span>`;
+    row.onclick=()=>{
+      if(compareMode){compareUserIds.has(u.id)?compareUserIds.delete(u.id):compareUserIds.add(u.id);}
+      else{selectedUserId=u.id;}
+      renderUserList();renderLoadoutDisplay();
+    };
+    el.appendChild(row);
+  });
+}
+
+function renderLoadoutDisplay(){
+  const el=document.getElementById('loadout-display');
+  if(compareMode&&compareUserIds.size>0){renderCompare(el);return;}
+  const user=users.find(u=>u.id===selectedUserId);
+  if(!user){el.innerHTML=`<div class="empty"><div class="ei">📡</div><div>Select a user to view their radio loadout</div></div>`;return;}
+  const radios=user.radios.map(id=>radioById(id)).filter(Boolean);
+  const typeSet=new Set(radios.map(r=>r.type));
+  const covHtml=[...typeSet].map(t=>`<span class="rc-badge" style="background:${TYPES[t].color}22;color:${TYPES[t].color};border:1px solid ${TYPES[t].color}44">${TYPES[t].label}</span>`).join('');
+  el.innerHTML=`
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-weight:600;font-size:16px;color:var(--text0)">${user.name}</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text2)">${user.role} · ${radios.length} radio${radios.length!==1?'s':''} assigned</div>
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">${covHtml}</div>
+    </div>
+    <div class="rc-grid" id="rc-cards"></div>
+    <div id="iop-wrap" style="margin-top:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:14px"></div>`;
+  const cards=document.getElementById('rc-cards');
+  radios.forEach(r=>{
+    const tc=TYPES[r.type],mc=MOD_COLORS[r.modClass];
+    const gain=getAntennaGain(r),antType=getAntennaType(r);
+    const modLbl={analog:'Analog',digital:'Digital',hybrid:'Hybrid',mesh:'LoRa Mesh',halow:'802.11ah'}[r.modClass]||r.modClass;
+    const card=document.createElement('div');card.className='rc';
+    card.innerHTML=`
+      <div class="rc-hdr"><div class="rc-name">${r.name}</div><span class="rc-dot" style="background:${tc.color}"></span></div>
+      <div class="rc-body">
+        <div class="rc-row"><span class="rc-k">FREQ</span><span class="rc-v">${r.freqLo}–${r.freqHi} MHz</span></div>
+        <div class="rc-row"><span class="rc-k">TX POWER</span><span class="rc-v">${r.wattage}</span></div>
+        <div class="rc-row"><span class="rc-k">MODULATION</span><span class="rc-v">${r.mod}</span></div>
+        <div class="rc-row"><span class="rc-k">CHANNELS</span><span class="rc-v">${r.channels}</span></div>
+        <div class="rc-row"><span class="rc-k">REPEATER</span><span class="rc-v">${r.repeater}</span></div>
+        <div class="rc-row"><span class="rc-k">RX SENS</span><span class="rc-v" style="color:var(--green)">${r.rxSens} dBm</span></div>
+        <div class="rc-row"><span class="rc-k">ANT TYPE</span>
+          <input class="rc-edit" value="${antType}" onchange="setAntType('${r.id}',this.value)" title="Click to edit antenna type">
+        </div>
+        <div class="rc-row"><span class="rc-k">ANT GAIN</span>
+          <input class="rc-edit" type="number" step="0.5" value="${gain.toFixed(1)}" onchange="setAntGain('${r.id}',parseFloat(this.value))" title="Click to edit antenna gain (dBi)">
+        </div>
+      </div>
+      <div class="rc-badges">
+        <span class="rc-badge" style="background:${mc}22;color:${mc};border:1px solid ${mc}44">${modLbl}</span>
+        <span class="rc-badge" style="background:${tc.color}22;color:${tc.color};border:1px solid ${tc.color}44">${tc.label}</span>
+      </div>
+      <div class="rc-footer">
+        <span class="rc-freq">${r.freqLo}–${r.freqHi} MHz</span>
+        <a class="plan-btn" href="${buildPlannerUrl(r)}" target="_blank">Open Site Planner ↗</a>
+      </div>`;
+    cards.appendChild(card);
+  });
+
+  // Interop
+  const iop=document.getElementById('iop-wrap');
+  if(radios.length<2){iop.innerHTML=`<div style="font-family:var(--mono);font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Interoperability</div><div style="font-size:12px;color:var(--text2)">Assign 2+ radios to analyse interoperability.</div>`;return;}
+  let rows='';
+  for(let i=0;i<radios.length;i++)for(let j=i+1;j<radios.length;j++){
+    const a=radios[i],b=radios[j];
+    const fo=a.freqLo<b.freqHi&&b.freqLo<a.freqHi;
+    const sm=a.modClass===b.modClass||(a.modClass==='hybrid'||b.modClass==='hybrid');
+    let st,col,det;
+    if(fo&&sm){st='Direct';col='var(--green)';det=`Shared ${Math.max(a.freqLo,b.freqLo)}–${Math.min(a.freqHi,b.freqHi)} MHz · same modulation`;}
+    else if(fo){st='Partial';col='var(--amber)';det='Freq overlap but mixed digital/analog — program analog fallback ch';}
+    else if(a.type===b.type){st='Same class';col='var(--accent)';det='Same band class, diff freq segments — relay or gateway needed';}
+    else{st='No direct';col='var(--text2)';det='Different bands — cross-band repeater or gateway required';}
+    rows+=`<tr><td>${a.name}</td><td>${b.name}</td><td><span class="sdot" style="background:${col}"></span>${st}</td><td style="color:var(--text2);font-size:10px">${det}</td></tr>`;
+  }
+  iop.innerHTML=`<div style="font-family:var(--mono);font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Interoperability Matrix</div>
+    <table class="iop-table"><thead><tr><th>Radio A</th><th>Radio B</th><th>Status</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderCompare(el){
+  const list=[...compareUserIds].map(id=>users.find(u=>u.id===id)).filter(Boolean);
+  if(!list.length){el.innerHTML=`<div style="padding:10px;color:var(--amber);font-size:12px;border:1px solid rgba(232,168,64,.25);border-radius:var(--r);background:rgba(232,168,64,.06)">Select users from the roster to compare</div>`;return;}
+  const rsets=list.map(u=>new Set(u.radios));
+  const allIds=new Set(list.flatMap(u=>u.radios));
+  const sharedIds=[...allIds].filter(id=>rsets.every(s=>s.has(id)));
+  let html=`<div style="margin-bottom:10px;padding:8px 12px;background:rgba(232,168,64,.06);border:1px solid rgba(232,168,64,.2);border-radius:var(--r);font-size:12px;color:var(--amber)">Comparing ${list.length} personnel · <strong>${sharedIds.length}</strong> shared radio${sharedIds.length!==1?'s':''}</div>`;
+  html+=`<div style="display:grid;grid-template-columns:repeat(${list.length},1fr);gap:12px">`;
+  list.forEach(u=>{
+    const radios=u.radios.map(id=>radioById(id)).filter(Boolean);
+    html+=`<div><div style="font-weight:600;font-size:13px;color:var(--text0);margin-bottom:2px">${u.name}</div><div style="font-family:var(--mono);font-size:10px;color:var(--text2);margin-bottom:10px">${u.role} · ${radios.length} radios</div><div style="display:flex;flex-direction:column;gap:6px">`;
+    radios.forEach(r=>{
+      const tc=TYPES[r.type],sh=sharedIds.includes(r.id);
+      html+=`<div style="padding:8px 10px;border-radius:var(--r);border:1px solid ${sh?'rgba(78,201,148,.3)':'var(--border)'};background:${sh?'rgba(78,201,148,.06)':'var(--bg2)'}">
+        <div style="font-size:12px;font-weight:500;color:var(--text0);margin-bottom:2px">${r.name}${sh?' <span style="font-family:var(--mono);font-size:9px;color:var(--green)">SHARED</span>':''}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text2)">${r.freqLo}–${r.freqHi} MHz · ${r.mod}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text2)">RX ${r.rxSens} dBm · Ant ${getAntennaGain(r).toFixed(1)} dBi</div>
+        <div style="font-family:var(--mono);font-size:10px;color:${tc.color};margin-top:2px">${tc.label}</div>
+      </div>`;
+    });
+    html+=`</div></div>`;
+  });
+  html+=`</div>`;el.innerHTML=html;
+}
+
+// editable antenna
+function setAntType(id,val){if(!antennaOverrides[id])antennaOverrides[id]={};antennaOverrides[id].type=val;}
+function setAntGain(id,val){if(!antennaOverrides[id])antennaOverrides[id]={};antennaOverrides[id].gain=val;}
+
+// ══════════════════════════════════════════════════════════════════
+// SITE PLANNER TAB
+// ══════════════════════════════════════════════════════════════════
+function buildSpRadioSel(){
+  const sel=document.getElementById('sp-radio-sel');
+  if(sel.options.length>1)return;
+  RADIOS.forEach(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=r.name;sel.appendChild(o);});
+  // also populate link budget RX
+  const lb=document.getElementById('lb-rxradio');
+  RADIOS.forEach(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=r.name;lb.appendChild(o);});
+}
+
+function spRadioChanged(){
+  const id=document.getElementById('sp-radio-sel').value;
+  const r=radioById(id);
+  const p=document.getElementById('sp-radio-params');
+  if(!r){p.innerHTML='';return;}
+  const freqMid=((r.freqLo+r.freqHi)/2).toFixed(3);
+  document.getElementById('sp-freq').value=freqMid;
+  document.getElementById('sp-txdbm').value=r.txDbm;
+  document.getElementById('sp-tx-gain').value=getAntennaGain(r).toFixed(1);
+  document.getElementById('sp-rx-sens').value=r.rxSens;
+  p.innerHTML=`
+    <div style="grid-column:1/-1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:9px 12px;font-size:11px">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--accent);margin-bottom:5px">AUTO-LOADED FROM INVENTORY</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px">
+        <span style="color:var(--text2);font-size:10px">Freq (centre)</span><span style="font-family:var(--mono);font-size:10px">${freqMid} MHz</span>
+        <span style="color:var(--text2);font-size:10px">TX Power</span><span style="font-family:var(--mono);font-size:10px">${r.txDbm} dBm</span>
+        <span style="color:var(--text2);font-size:10px">TX Ant Gain</span><span style="font-family:var(--mono);font-size:10px">${getAntennaGain(r).toFixed(1)} dBi</span>
+        <span style="color:var(--text2);font-size:10px">RX Sensitivity</span><span style="font-family:var(--mono);font-size:10px;color:var(--green)">${r.rxSens} dBm</span>
+        <span style="color:var(--text2);font-size:10px">Ant Type</span><span style="font-family:var(--mono);font-size:10px;grid-column:2">${getAntennaType(r)}</span>
+      </div>
+    </div>`;
+  updateSpConfigDisplay();calcFSPL();
+}
+
+function getSpParams(){
+  return {
+    siteName:  document.getElementById('sp-site-name').value||'Site Alpha',
+    lat:       parseFloat(document.getElementById('sp-lat').value)||33.749,
+    lon:       parseFloat(document.getElementById('sp-lon').value)||-84.388,
+    txHeight:  parseFloat(document.getElementById('sp-tx-height').value)||10,
+    freq:      parseFloat(document.getElementById('sp-freq').value)||915,
+    txDbm:     parseFloat(document.getElementById('sp-txdbm').value)||30,
+    txGain:    parseFloat(document.getElementById('sp-tx-gain').value)||2,
+    cableLoss: parseFloat(document.getElementById('sp-cable').value)||2,
+    rxSens:    parseFloat(document.getElementById('sp-rx-sens').value)||-130,
+    rxHeight:  parseFloat(document.getElementById('sp-rx-height').value)||1.5,
+    rxGain:    parseFloat(document.getElementById('sp-rx-gain').value)||2,
+    range:     parseFloat(document.getElementById('sp-range').value)||20,
+    env:       document.getElementById('sp-env').value,
+    clutter:   parseFloat(document.getElementById('sp-clutter').value)||0,
+  };
+}
+
+// Build site planner URL — the site planner does not support URL params
+// so we always just link to the base URL and show manual entry values
+function buildPlannerUrl(r){
+  return 'https://site.meshtastic.org';
+}
+
+function updateSpConfigDisplay(){
+  const p=getSpParams();
+  const tbody=document.getElementById('sp-config-table');
+  if(!tbody)return;
+  const rows=[
+    ['Site / Tx Name',     p.siteName],
+    ['Latitude (°)',       p.lat.toFixed(4)],
+    ['Longitude (°)',      p.lon.toFixed(4)],
+    ['Tx Antenna Height',  p.txHeight+' m AGL'],
+    ['Frequency',          p.freq+' MHz'],
+    ['Transmit Power',     p.txDbm+' dBm  ('+dbmToWatts(p.txDbm)+' W)'],
+    ['Tx Antenna Gain',    p.txGain+' dBi'],
+    ['Cable Loss',         p.cableLoss+' dB'],
+    ['Rx Sensitivity',     p.rxSens+' dBm'],
+    ['Rx Height',          p.rxHeight+' m AGL'],
+    ['Rx Antenna Gain',    p.rxGain+' dBi'],
+    ['Max Range',          p.range+' km'],
+    ['Environment',        p.env],
+    ['Clutter Height',     p.clutter+' m'],
+  ];
+  tbody.innerHTML=rows.map(([k,v])=>`<tr style="border-bottom:1px solid rgba(255,255,255,.04)"><td style="color:var(--text2);font-family:var(--mono);font-size:10px;padding:4px 6px;white-space:nowrap">${k}</td><td style="color:var(--text0);font-family:var(--mono);font-size:11px;padding:4px 6px;font-weight:600">${v}</td></tr>`).join('');
+}
+
+document.querySelectorAll('#tab-siteplan input,#tab-siteplan select').forEach(el=>{
+  el.addEventListener('input',()=>{updateSpConfigDisplay();});
+});
+
+function dbmToWatts(dbm){const w=Math.pow(10,(dbm-30)/10);return w>=1?w.toFixed(1):(w*1000).toFixed(0)+'m';}
+
+// FSPL: PL(dB) = 20log10(d) + 20log10(f) + 20log10(4π/c)
+// = 20log10(d_km) + 20log10(f_mhz) + 32.44
+// Max range: d = 10^((EIRP - RxSens - RxGain + 32.44 + 20log10(f)) / -20 ... rearranged
+function calcFSPL(){
+  const p=getSpParams();
+  updateSpConfigDisplay();
+  const eirp=p.txDbm+p.txGain-p.cableLoss;
+  const systemGain=eirp-p.rxSens+p.rxGain; // total link budget dB
+  const k=20*Math.log10(p.freq)+32.44;
+  const maxRangeKm=Math.pow(10,(systemGain-k)/20);
+  const losAtRange=(d)=>20*Math.log10(d)+k;
+  const margin=(d)=>systemGain-losAtRange(d);
+
+  // table at distances
+  const dists=[0.1,0.5,1,2,5,10,20,50,100];
+  const tableRows=dists.map(d=>{
+    const fspl=losAtRange(d);
+    const m=systemGain-fspl;
+    const ok=m>0;
+    return `<tr><td class="${ok?'hl':''}">${d>=1?d+'km':(d*1000)+'m'}</td><td>${fspl.toFixed(1)}</td><td style="color:${m>10?'var(--green)':m>0?'var(--amber)':'var(--coral)'}">${m.toFixed(1)}</td><td>${ok?'✓ Link':'✗ No link'}</td></tr>`;
+  }).join('');
+
+  document.getElementById('fspl-out').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+      <div class="fspl-result"><div class="sub">EIRP</div><div class="big">${eirp.toFixed(1)} dBm</div><div class="sub">${dbmToWatts(eirp)} W effective</div></div>
+      <div class="fspl-result"><div class="sub">Link Budget</div><div class="big">${systemGain.toFixed(1)} dB</div><div class="sub">total system gain</div></div>
+      <div class="fspl-result"><div class="sub">Max FSPL Range</div><div class="big" style="color:var(--accent)">${maxRangeKm>999?'>999':maxRangeKm.toFixed(1)} km</div><div class="sub">free space (no terrain)</div></div>
+    </div>
+    <table class="fspl-table">
+      <thead><tr><th>Distance</th><th>FSPL (dB)</th><th>Margin (dB)</th><th>Status</th></tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+    <div style="margin-top:8px;font-size:10px;color:var(--text2);font-family:var(--mono)">FSPL = 20·log₁₀(d_km) + 20·log₁₀(f_MHz) + 32.44 · EIRP = TxPwr + TxGain − CableLoss · Margin = EIRP + RxGain − RxSens − FSPL</div>`;
+  calcLinkBudget();
+}
+
+function calcLinkBudget(){
+  const p=getSpParams();
+  const eirp=p.txDbm+p.txGain-p.cableLoss;
+  const rxId=document.getElementById('lb-rxradio')?.value;
+  const rxR=rxId?radioById(rxId):null;
+  const rxSens=rxR?rxR.rxSens:p.rxSens;
+  const rxGain=rxR?getAntennaGain(rxR):p.rxGain;
+  const rxLabel=rxR?rxR.name:'Same as TX params';
+  document.getElementById('lb-nodeA').textContent=`EIRP: ${eirp.toFixed(1)} dBm @ ${p.freq} MHz`;
+  const lb=eirp+rxGain-rxSens;
+  const k=20*Math.log10(p.freq)+32.44;
+  const d=Math.pow(10,(lb-k)/20);
+  document.getElementById('lb-out').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div class="fspl-result"><div class="sub">Rx: ${rxLabel}</div><div class="big" style="font-size:16px">${rxSens} dBm</div><div class="sub">RX sensitivity</div></div>
+      <div class="fspl-result"><div class="sub">Rx Ant Gain</div><div class="big" style="font-size:16px">${rxGain.toFixed(1)} dBi</div><div class="sub">effective gain</div></div>
+      <div class="fspl-result" style="grid-column:1/-1"><div class="sub">P2P Link Budget</div><div class="big">${lb.toFixed(1)} dB</div><div class="sub">Max FSPL range (free space): <strong style="color:var(--accent)">${d.toFixed(1)} km</strong></div></div>
+    </div>
+    <div style="font-size:11px;color:var(--text1);line-height:1.6">
+      Link budget = EIRP (${eirp.toFixed(1)} dBm) + Rx gain (${rxGain.toFixed(1)} dBi) − Rx sensitivity (${rxSens} dBm) = <strong>${lb.toFixed(1)} dB</strong><br>
+      <span style="color:var(--text2);font-size:10px">Use the Meshtastic Site Planner for terrain-corrected predictions (ITM/Longley-Rice model with NASA SRTM elevation data)</span>
+    </div>`;
+}
+
+function copySpConfig(){
+  const p=getSpParams();
+  const txt=`Meshtastic Site Planner Config — ${p.siteName}\n`+
+    `URL: https://site.meshtastic.org\n\n`+
+    `TRANSMITTER:\n  Site Name: ${p.siteName}\n  Latitude: ${p.lat}\n  Longitude: ${p.lon}\n`+
+    `  Antenna Height: ${p.txHeight} m AGL\n  Frequency: ${p.freq} MHz\n`+
+    `  TX Power: ${p.txDbm} dBm (${dbmToWatts(p.txDbm)} W)\n`+
+    `  TX Antenna Gain: ${p.txGain} dBi\n  Cable Loss: ${p.cableLoss} dB\n\n`+
+    `RECEIVER:\n  Sensitivity: ${p.rxSens} dBm\n  Height: ${p.rxHeight} m AGL\n`+
+    `  Antenna Gain: ${p.rxGain} dBi\n  Max Range: ${p.range} km\n\n`+
+    `PROPAGATION:\n  Environment: ${p.env}\n  Clutter Height: ${p.clutter} m`;
+  navigator.clipboard.writeText(txt).then(()=>alert('Config copied to clipboard!')).catch(()=>alert(txt));
+}
+
+
+// ============ ONBOARDING ============
+function dismissOnboard(){
+  try{localStorage.setItem('sc_c2_onboard_v5','1');}catch(e){}
+  document.getElementById('onboard-modal').style.display='none';
+}
+(function(){try{if(localStorage.getItem('sc_c2_onboard_v5')==='1')document.getElementById('onboard-modal').style.display='none';}catch(e){}})();
+
+// ============ PATCH showTab ============
+var _origST=showTab;
+showTab=function(t){
+  document.querySelectorAll('[id^="tab-"]').forEach(function(el){el.classList.toggle('hidden',el.id!=='tab-'+t);});
+  var tabs=['spectrum','radiolibrary','loadout','siteplan','codeplug','help'];
+  document.querySelectorAll('.tab-btn').forEach(function(b,i){b.classList.toggle('active',i===tabs.indexOf(t));});
+  if(t==='spectrum')draw();
+  if(t==='radiolibrary'){buildLibraryFilters();renderLib();}
+};
+
+// ============ PATCH addUser/deleteUser ============
+var _origAU=addUser;
+addUser=function(){
+  var name=document.getElementById('inp-name').value.trim();
+  var role=document.getElementById('inp-role').value;
+  if(!name){document.getElementById('inp-name').focus();return;}
+  users.push({id:uid(),name:name,role:role,radios:[...hwSel]});
+  try{localStorage.setItem('sc_c2_u5',JSON.stringify(users));}catch(e){}
+  hwSel.clear();document.getElementById('inp-name').value='';
+  buildHwAssign();renderUserList();renderLoadoutDisplay();
+};
+var _origDU=deleteUser;
+deleteUser=function(){
+  if(!selectedUserId)return;
+  if(!confirm('Remove from roster?'))return;
+  users=users.filter(function(u){return u.id!==selectedUserId;});
+  try{localStorage.setItem('sc_c2_u5',JSON.stringify(users));}catch(e){}
+  compareUserIds.delete(selectedUserId);selectedUserId=null;
+  renderUserList();renderLoadoutDisplay();
+};
+(function(){try{var s=localStorage.getItem('sc_c2_u5');if(s)users=JSON.parse(s);}catch(e){}})();
+
+// ============ ADDITIONAL RADIOS ============
+RADIOS.push(
+  {id:'bfdm32_v',brand:'Baofeng',  name:'Baofeng DM-32UV VHF',    type:'vhf_uhf',freqLo:136,  freqHi:174,    wattage:'10W',     txDbm:40,mod:'DMR/FM',         modClass:'digital',channels:'4000 ch',repeater:'Yes',rxSens:-122,antennaType:'Dual-band whip',antennaGain:2.15,antennaGainEditable:true,notes:'DMR Tier II + Analog; 10W; GPS+APRS; color display; USB-C; NOAA; 5-tone; BandScope',lane:7},
+  {id:'bfdm32_u',brand:'Baofeng',  name:'Baofeng DM-32UV UHF',    type:'vhf_uhf',freqLo:400,  freqHi:480,    wattage:'10W',     txDbm:40,mod:'DMR/FM',         modClass:'digital',channels:'4000 ch',repeater:'Yes',rxSens:-122,antennaType:'Dual-band whip',antennaGain:2.15,antennaGainEditable:true,notes:'UHF 400-480 MHz; DMR Tier II; 12.5/25 kHz; TDMA direct mode; roam zones',lane:8},
+  {id:'apx6000_v',brand:'Motorola',name:'APX 6000 VHF',            type:'p25',    freqLo:136,  freqHi:174,    wattage:'5W',      txDbm:37,mod:'P25 Ph1/Ph2/FM', modClass:'digital',channels:'3000 ch',repeater:'Yes',rxSens:-118,antennaType:'Portable VHF whip',antennaGain:2.0,antennaGainEditable:true,notes:'APX6000; P25 Ph1+Ph2; AES-256; OTAP; GPS; Bluetooth; MIL-STD-810; IP67',lane:13},
+  {id:'apx6000_8',brand:'Motorola',name:'APX 6000 700/800',        type:'p25',    freqLo:764,  freqHi:870,    wattage:'3W',      txDbm:35,mod:'P25 Ph1/Ph2/FM', modClass:'digital',channels:'3000 ch',repeater:'Yes',rxSens:-116,antennaType:'Portable 800MHz',antennaGain:2.0,antennaGainEditable:true,notes:'700/800 MHz; P25 Ph2; FirstNet Band 14; AES-256; 3W',lane:14},
+  {id:'kenwvp8000',brand:'Kenwood',name:'Kenwood VP8000 Tri-band', type:'p25',    freqLo:136,  freqHi:870,    wattage:'5W',      txDbm:37,mod:'P25/DMR/FM',     modClass:'digital',channels:'1024 ch',repeater:'Yes',rxSens:-118,antennaType:'Tri-band whip',antennaGain:2.0,antennaGainEditable:true,notes:'VHF/UHF/700-800; P25 Ph1+Ph2; DMR; GPS; Bluetooth; MIL-810; IP67',lane:9},
+  {id:'xpr7550_v',brand:'Motorola',name:'Motorola XPR7550 VHF',    type:'vhf_uhf',freqLo:136,  freqHi:174,    wattage:'5W',      txDbm:37,mod:'DMR Tier II/FM', modClass:'digital',channels:'1000 ch',repeater:'Yes',rxSens:-122,antennaType:'Portable VHF whip',antennaGain:2.0,antennaGainEditable:true,notes:'MOTOTRBO DMR Tier II+III; AES-256; GPS; Bluetooth; MIL-STD-810; IP57',lane:9},
+  {id:'anytone878',brand:'AnyTone',name:'AnyTone AT-D878UV',        type:'vhf_uhf',freqLo:144,  freqHi:470,    wattage:'7W',      txDbm:38,mod:'DMR/FM',         modClass:'digital',channels:'4000 ch',repeater:'Yes',rxSens:-122,antennaType:'Dual-band whip',antennaGain:2.15,antennaGainEditable:true,notes:'Dual-band DMR Tier II; GPS; APRS; Bluetooth; BrandMeister; 7W VHF/4W UHF',lane:10},
+  {id:'tytmd380', brand:'TYT',     name:'TYT MD-380 UHF DMR',      type:'vhf_uhf',freqLo:400,  freqHi:480,    wattage:'5W',      txDbm:37,mod:'DMR Tier II/FM', modClass:'digital',channels:'1000 ch',repeater:'Yes',rxSens:-121,antennaType:'Stubby UHF whip',antennaGain:2.0,antennaGainEditable:true,notes:'DMR Tier II; open firmware; BrandMeister; popular amateur DMR',lane:11},
+  {id:'stdhzgx',  brand:'Standard',name:'Standard Horizon GX2200', type:'marine', freqLo:156.025,freqHi:162.025,wattage:'25W/1W',txDbm:44,mod:'FM/DSC/AIS',    modClass:'hybrid', channels:'88 ch',  repeater:'No', rxSens:-117,antennaType:'Marine VHF collinear',antennaGain:3.0,antennaGainEditable:true,notes:'Marine VHF; built-in AIS; DSC; GPS; NOAA; IPX8; 25W',lane:1},
+  {id:'icoma25n', brand:'Icom',    name:'Icom IC-A25N VHF Air',    type:'aviation',freqLo:108,  freqHi:137,    wattage:'5W',      txDbm:37,mod:'AM/COM/NAV',    modClass:'analog', channels:'200 ch', repeater:'No', rxSens:-118,antennaType:'Aviation whip',antennaGain:2.0,antennaGainEditable:true,notes:'Aviation COM/NAV; 108-137 MHz; AM voice; VOR/ILS; Bluetooth; NOAA',lane:0},
+  {id:'iridium95',brand:'Iridium', name:'Iridium 9575 Extreme',    type:'satellite',freqLo:1616,freqHi:1626.5, wattage:'0.5W',   txDbm:27,mod:'QPSK/L-band',   modClass:'digital',channels:'Global', repeater:'Satellite',rxSens:-130,antennaType:'L-band omni',antennaGain:1.0,antennaGainEditable:true,notes:'Global LEO satellite phone; SBD data; emergency SOS; GPS; IP65',lane:0},
+  {id:'grmninrch',brand:'Garmin',  name:'Garmin inReach Mini 2',   type:'satellite',freqLo:1616,freqHi:1626.5, wattage:'0.5W',   txDbm:27,mod:'Iridium SBD',   modClass:'digital',channels:'Text/SOS',repeater:'Satellite',rxSens:-130,antennaType:'L-band omni',antennaGain:1.0,antennaGainEditable:true,notes:'2-way satellite text; SOS; GPS; 100-day battery; Iridium network; IP67',lane:1},
+  {id:'murs_bf',  brand:'Baofeng', name:'Baofeng BF-888S MURS',    type:'murs',   freqLo:151.82,freqHi:154.60, wattage:'5W',     txDbm:37,mod:'FM Analog',     modClass:'analog', channels:'5 MURS', repeater:'No', rxSens:-122,antennaType:'Stubby whip',antennaGain:2.0,antennaGainEditable:true,notes:'MURS 151/154 MHz; no license required; CTCSS/DCS; Part 95',lane:3},
+  {id:'midland_g',brand:'Midland', name:'Midland GXT1050VP4',      type:'gmrs',   freqLo:462.5625,freqHi:467.725,wattage:'5W',  txDbm:37,mod:'FM Analog',     modClass:'analog', channels:'50 ch',  repeater:'Yes',rxSens:-116,antennaType:'Stubby (stock)',antennaGain:0.0,antennaGainEditable:true,notes:'GMRS; repeater capable; NOAA; water resistant; 50 channels',lane:2}
+);
+if(!TYPES.satellite)TYPES.satellite={label:'Satellite L-band',color:'#c0c0e8'};
+if(!TYPES.aviation) TYPES.aviation= {label:'VHF Aviation',    color:'#e8c840'};
+if(!TYPES.murs)     TYPES.murs=    {label:'MURS 151/154',     color:'#6acfb4'};
+
+// ============ RADIO LIBRARY ============
+var _libBrand='all',_libBand='all',_libType='all',_libBuilt=false,_libSel={};
+
+function buildLibraryFilters(){
+  if(_libBuilt)return;_libBuilt=true;
+  var brands=Array.from(new Set(RADIOS.map(function(r){return r.brand;}))).sort();
+  ['all'].concat(brands).forEach(function(b){
+    var c=document.createElement('span');c.className='rl-chip'+(b==='all'?' active':'');
+    c.textContent=b==='all'?'All Brands':b;c.dataset.v=b;
+    c.onclick=function(){_libBrand=b;document.querySelectorAll('#rl-brand-f .rl-chip').forEach(function(x){x.classList.toggle('active',x.dataset.v===b);});renderLib();};
+    document.getElementById('rl-brand-f').appendChild(c);
+  });
+  [{v:'all',l:'All'},{v:'hf',l:'HF'},{v:'vhf',l:'VHF'},{v:'uhf',l:'UHF'},{v:'b800',l:'700/800'},{v:'sub1g',l:'Sub-GHz'},{v:'lband',l:'L-band'}].forEach(function(b){
+    var c=document.createElement('span');c.className='rl-chip'+(b.v==='all'?' active':'');
+    c.textContent=b.l;c.dataset.v=b.v;
+    c.onclick=function(){_libBand=b.v;document.querySelectorAll('#rl-band-f .rl-chip').forEach(function(x){x.classList.toggle('active',x.dataset.v===b.v);});renderLib();};
+    document.getElementById('rl-band-f').appendChild(c);
+  });
+  Object.entries(TYPES).forEach(function(e){
+    var k=e[0],t=e[1];var c=document.createElement('span');c.className='rl-chip';
+    c.textContent=t.label;c.dataset.v=k;
+    c.onclick=function(){_libType=(_libType===k)?'all':k;document.querySelectorAll('#rl-type-f .rl-chip').forEach(function(x){x.classList.toggle('active',x.dataset.v===_libType);});renderLib();};
+    document.getElementById('rl-type-f').appendChild(c);
+  });
+}
+
+function _libBandMatch(r,b){
+  var lo=r.freqLo,hi=r.freqHi;
+  if(b==='all')return true;if(b==='hf')return hi<=30;if(b==='vhf')return lo>=30&&lo<300;
+  if(b==='uhf')return lo>=300&&lo<700;if(b==='b800')return lo>=700&&lo<1000;
+  if(b==='sub1g')return lo>=400&&hi<=930;if(b==='lband')return lo>=1000;return true;
+}
+
+function renderLib(){
+  var q=(document.getElementById('rl-srch').value||'').toLowerCase();
+  var f=RADIOS.filter(function(r){
+    if(_libBrand!=='all'&&r.brand!==_libBrand)return false;
+    if(!_libBandMatch(r,_libBand))return false;
+    if(_libType!=='all'&&r.type!==_libType)return false;
+    if(q&&r.name.toLowerCase().indexOf(q)<0&&(r.brand||'').toLowerCase().indexOf(q)<0&&(r.notes||'').toLowerCase().indexOf(q)<0)return false;
+    return true;
+  });
+  document.getElementById('rl-cnt').textContent=f.length+' / '+RADIOS.length+' radios';
+  var grid=document.getElementById('rl-grid');grid.innerHTML='';
+  f.forEach(function(r){
+    var tc=TYPES[r.type]||{color:'#888',label:r.type},mc=MOD_COLORS[r.modClass]||'#888',sel=!!_libSel[r.id];
+    var card=document.createElement('div');card.className='rl-card'+(sel?' rl-sel':'');
+    card.innerHTML='<div class="rl-hdr"><div><div class="rl-brand">'+r.brand+'</div><div class="rl-cname">'+r.name+'</div></div><span style="width:9px;height:9px;border-radius:50%;background:'+tc.color+';flex-shrink:0;margin-top:5px;display:block"></span></div><div class="rl-body"><div><div class="rl-k">FREQ</div><div class="rl-v">'+r.freqLo+'-'+r.freqHi+' MHz</div></div><div><div class="rl-k">TX POWER</div><div class="rl-v">'+r.wattage+'</div></div><div><div class="rl-k">MODULATION</div><div class="rl-v">'+r.mod+'</div></div><div><div class="rl-k">RX SENS</div><div class="rl-v" style="color:var(--green)">'+r.rxSens+' dBm</div></div></div><div style="padding:5px 12px 8px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border)"><span style="font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:99px;background:'+mc+'22;color:'+mc+';border:1px solid '+mc+'44">'+r.modClass+'</span><button class="btn sm'+(sel?' pr':'')+'" onclick="event.stopPropagation();libToggle(\''+r.id+'\',this)">'+(sel?'\u2713 Selected':'+ Select')+'</button></div>';
+    card.onclick=function(){showLibDetail(r.id);};
+    grid.appendChild(card);
+  });
+}
+
+function libToggle(id,btn){
+  _libSel[id]=!_libSel[id];
+  btn.textContent=_libSel[id]?'\u2713 Selected':'+ Select';
+  btn.classList.toggle('pr',!!_libSel[id]);
+  var card=btn.closest('.rl-card');if(card)card.classList.toggle('rl-sel',!!_libSel[id]);
+  buildHwAssign();
+}
+
+function showLibDetail(id){
+  var r=RADIOS.find(function(x){return x.id===id;});if(!r)return;
+  var tc=TYPES[r.type]||{color:'#888'},mc=MOD_COLORS[r.modClass]||'#888';
+  var det=document.getElementById('rl-det');det.classList.add('show');
+  det.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;flex-wrap:wrap;gap:8px"><div><div style="font-family:var(--mono);font-size:10px;color:var(--text2)">'+r.brand+'</div><div style="font-size:17px;font-weight:600;color:var(--text0);margin-bottom:4px">'+r.name+'</div><span style="font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:99px;background:'+mc+'22;color:'+mc+';border:1px solid '+mc+'44">'+r.mod+'</span></div><button class="btn sm" onclick="document.getElementById(\'rl-det\').classList.remove(\'show\')">Close</button></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px"><div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:8px 12px"><div style="font-family:var(--mono);font-size:9px;color:var(--text2);margin-bottom:2px">FREQUENCY</div><div style="font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:600">'+r.freqLo+' - '+r.freqHi+' MHz</div></div><div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:8px 12px"><div style="font-family:var(--mono);font-size:9px;color:var(--text2);margin-bottom:2px">TX POWER</div><div style="font-family:var(--mono);font-size:11px;font-weight:600">'+r.wattage+' ('+r.txDbm+' dBm)</div></div><div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:8px 12px"><div style="font-family:var(--mono);font-size:9px;color:var(--text2);margin-bottom:2px">RX SENSITIVITY</div><div style="font-family:var(--mono);font-size:11px;color:var(--green);font-weight:600">'+r.rxSens+' dBm</div></div><div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:8px 12px"><div style="font-family:var(--mono);font-size:9px;color:var(--text2);margin-bottom:2px">MODULATION</div><div style="font-family:var(--mono);font-size:11px;font-weight:600">'+r.mod+'</div></div><div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:8px 12px"><div style="font-family:var(--mono);font-size:9px;color:var(--text2);margin-bottom:2px">CHANNELS</div><div style="font-family:var(--mono);font-size:11px;font-weight:600">'+r.channels+'</div></div><div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:8px 12px"><div style="font-family:var(--mono);font-size:9px;color:var(--text2);margin-bottom:2px">ANTENNA</div><div style="font-family:var(--mono);font-size:11px;font-weight:600">'+r.antennaType+'</div></div></div><div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;font-size:11px;color:var(--text1)"><div style="font-family:var(--mono);font-size:9px;color:var(--text2);margin-bottom:4px">NOTES</div>'+r.notes+'</div>';
+}
+
+var _origBHW=buildHwAssign;
+buildHwAssign=function(){
+  var w=document.getElementById('hw-assign');w.innerHTML='';
+  var sorted=RADIOS.slice().sort(function(a,b){return(_libSel[b.id]?1:0)-(_libSel[a.id]?1:0);});
+  sorted.forEach(function(r){
+    var c=document.createElement('span');
+    c.className='hw-chip'+(hwSel.has(r.id)?' sel':'');
+    if(_libSel[r.id]&&!hwSel.has(r.id))c.style.borderColor='rgba(78,201,148,.5)';
+    c.textContent=r.name;
+    c.onclick=function(){hwSel.has(r.id)?hwSel.delete(r.id):hwSel.add(r.id);buildHwAssign();};
+    w.appendChild(c);
+  });
+};
+
+// ============ CODEPLUG PARSER ============
+var _cpgCache=null;
+function cpBrowse(){document.getElementById('cp-file-input').click();}
+function cpOver(e){e.preventDefault();document.getElementById('cp-dz').classList.add('over');}
+function cpLeave(){document.getElementById('cp-dz').classList.remove('over');}
+function cpDrop(e){
+  e.preventDefault();cpLeave();
+  var files=Array.prototype.slice.call(e.dataTransfer.files);if(!files.length)return;
+  var logF=null,cpgF=null;
+  files.forEach(function(f){var ext=f.name.split('.').pop().toLowerCase();if(ext==='cpglog')logF=f;else if(ext==='cpg')cpgF=f;});
+  if(logF&&cpgF){logF.text().then(function(t){_cpgCache=t;cpParseFile(cpgF);});}
+  else{cpParseFile(files[0]);}
+}
+document.getElementById('cp-file-input').addEventListener('change',function(e){if(e.target.files&&e.target.files[0])cpParseFile(e.target.files[0]);});
+
+function _psMsg(msg,type){
+  var el=document.getElementById('cp-ps');el.style.display='block';
+  var cols={ok:'78,201,148',err:'224,96,96',warn:'232,168,64',info:'79,163,224'};
+  var col=cols[type]||cols.info;
+  el.style.background='rgba('+col+',.08)';el.style.border='1px solid rgba('+col+',.35)';
+  el.style.color=type==='ok'?'var(--green)':type==='err'?'var(--coral)':type==='warn'?'var(--amber)':'var(--accent)';
+  el.innerHTML=msg;
+}
+function _pBand(f){f=parseFloat(f)||0;if(f>=136&&f<380)return'VHF';if(f>=380&&f<700)return'UHF';if(f>=700&&f<800)return'700';if(f>=800&&f<870)return'800';return'UHF';}
+function _pOfs(rx,tx){try{var d=parseFloat(tx)-parseFloat(rx);if(Math.abs(d)<0.0001)return'Simplex';return(d>0?'+':'')+d.toFixed(4)+' MHz';}catch(e){return'Simplex';}}
+function _pSq(t,c){var t2=(t||'').toUpperCase().trim(),c2=(c||'').trim();if(t2==='CSQ'||!c2||c2==='0')return['CSQ',''];if(t2==='DPL'||t2==='DCS'||t2==='CDCSS')return['DCS',c2];if(t2==='TPL'||t2==='PL'||t2==='CTCSS')return['CTCSS',c2];return[t2,c2];}
+
+function cpParseFile(file){
+  var ext=file.name.split('.').pop().toLowerCase();
+  _psMsg('Parsing '+file.name+' ...','info');
+  function ok(n){_psMsg('\u2713 Decoded '+n+' channels from '+file.name,'ok');}
+  function err(m){_psMsg('\u2717 '+m,'err');}
+  function warn(m){_psMsg(m,'warn');}
+  if(ext==='json'){file.text().then(function(t){try{var r=JSON.parse(t);if(!r.channels||!r.channels.length)throw new Error('No channels');ok(r.channels.length);cpData=r;cpRender();}catch(e){err('JSON: '+e.message);}});}
+  else if(ext==='cps'){file.arrayBuffer().then(function(buf){try{var r=_pCPS(new Uint8Array(buf));if(!r.channels.length)throw new Error('No channels');ok(r.channels.length);cpData=r;cpRender();}catch(e){err('CPS: '+e.message);}});}
+  else if(ext==='cpglog'){file.text().then(function(t){try{_cpgCache=t;var r=_pCPGLOG(t);if(!r.channels.length)throw new Error('No channels');ok(r.channels.length);cpData=r;cpRender();}catch(e){err('CPGLOG: '+e.message);}});}
+  else if(ext==='cpg'){if(_cpgCache){try{var r=_pCPGLOG(_cpgCache);if(!r.channels.length)throw new Error('No channels');ok(r.channels.length);cpData=r;cpRender();}catch(e){err('CPG: '+e.message);}}else{warn('Drop the <strong>.cpglog</strong> companion file first, then drop the .cpg file.');}}
+  else if(ext==='data'){file.arrayBuffer().then(function(buf){try{var hdr=new Uint8Array(buf,0x30,8),sig='';for(var i=0;i<8&&hdr[i];i++)sig+=String.fromCharCode(hdr[i]);if(sig.indexOf('DM32')<0)throw new Error('Not a DM-32 .data file');var r=_pDM32(buf);if(!r.channels.length)throw new Error('No channels');ok(r.channels.length);cpData=r;cpRender();}catch(e){err('.data: '+e.message);}});}
+  else if(ext==='img'){file.text().then(function(t){try{var r=_pIMG(t);if(!r||!r.channels.length)throw new Error('Not a CHIRP CSV export');ok(r.channels.length);cpData=r;cpRender();}catch(e){err('.img: '+e.message);}});}
+  else{err('Unsupported: .'+ext+' (use .cps .cpglog .cpg .data .img .json)');}
+}
+
+function _pCPS(bytes){
+  var dec=new Uint8Array(bytes.length);for(var i=0;i<bytes.length;i++)dec[i]=bytes[i]^0x95;
+  var xml=new TextDecoder().decode(dec),doc=new DOMParser().parseFromString(xml,'text/xml');
+  var radio='',serial='',zone='',n=0,chs=[];
+  var ri=doc.querySelector('RI_BLOCK ENTRY_DATA');
+  if(ri){radio=((ri.querySelector('RI_MODELNUM')||{textContent:''}).textContent||'').trim();serial=((ri.querySelector('RI_SERIALNUM')||{textContent:''}).textContent||'').trim();}
+  var pa=doc.querySelector('PA_BLOCK ALIAS');if(pa)zone=pa.textContent.trim();
+  doc.querySelectorAll('CP_BLOCK ENTRY_DATA').forEach(function(e){
+    n++;function g(t){return((e.querySelector(t)||{textContent:''}).textContent||'').trim();}
+    var rx=g('CP_RXFREQ'),tx=g('CP_TXFREQ'),sq=_pSq(g('CP_RXSQCODESEL'),g('CP_RXDECDATA')),sqT=_pSq(g('CP_TXSQCODESEL'),g('CP_TXENCDATA'));
+    chs.push({num:n,name:g('ALIAS')||'Pers'+n,band:_pBand(rx),rx:parseFloat(rx)||0,tx:parseFloat(tx)||0,duplex:_pOfs(rx,tx),tone_rx:sq[1]||'None',tone_tx:sqT[1]||'None',power:g('CP_TXPWRLEVSEL')||'High',rx_only:g('CP_RXONLY')==='1'?'Yes':'No',notes:''});
+  });
+  return{radio:radio+(serial?' SN:'+serial:''),cps_version:'Browser[CPS]',zone:zone,parsed:new Date().toISOString().slice(0,10),channels:chs};
+}
+
+function _pCPGLOG(text){
+  var lines=text.split(/\r?\n/),st={},zone='';
+  lines.forEach(function(ln){var p=ln.split('\t');if(p.length<3)return;var fld=p[0].trim(),loc=p[1].trim(),val=(p[3]||'').trim();if(loc.indexOf('Zone Page in Personality Assignment to Zone')>=0){if(fld==='Alias'&&val)zone=val;return;}if(loc.indexOf('Conventional Personality -')>=0){var m=loc.match(/-\s*(\d+)\s*$/);if(!m)return;var k=parseInt(m[1]);if(!st[k])st[k]={};st[k][fld]=val;}});
+  var chs=Object.keys(st).sort(function(a,b){return a-b;}).map(function(k){var ch=st[k],rx=ch['Radio Rx Freq']||'',tx=ch['Radio Tx Freq']||'',sq=_pSq(ch['Rx Squelch Code Type'],ch['Rx DPL Code']||ch['Rx TPL Frequency']),sqT=_pSq(ch['Tx Squelch Code Type'],ch['Tx DPL Code']||ch['Tx TPL Frequency']);return{num:parseInt(k),name:ch['Alias']||'CH'+k,band:_pBand(rx),rx:parseFloat(rx)||0,tx:parseFloat(tx)||0,duplex:_pOfs(rx,tx),tone_rx:sq[1]||'None',tone_tx:sqT[1]||'None',power:'High',rx_only:'No',notes:''};});
+  return{radio:'Motorola Conventional',cps_version:'Browser[CPGLOG]',zone:zone,parsed:new Date().toISOString().slice(0,10),channels:chs};
+}
+
+function _pDM32(buf){
+  var data=new Uint8Array(buf),ver='',model='DM-32UV',chs=[],view=new DataView(buf);
+  for(var i=0x30;i<0x40&&data[i];i++)ver+=String.fromCharCode(data[i]);
+  try{var m2='';for(var j=0x500F;j<0x501F&&data[j];j++)m2+=String.fromCharCode(data[j]);if(m2.trim())model=m2.trim();}catch(e){}
+  for(var ci=0;ci<300;ci++){var off=0x021000+ci*0x30;if(off+0x30>data.length)break;var nm='';for(var ni=16;ni<32;ni++){var b=data[off+ni];if(!b)break;if(b>=32&&b<127)nm+=String.fromCharCode(b);}nm=nm.trim();if(!nm||nm.length<2)continue;var bad=false;for(var bi=0;bi<nm.length;bi++)if(nm.charCodeAt(bi)>126){bad=true;break;}if(bad)continue;var rx2=0,tx2=0;try{rx2=view.getFloat32(off+32,true);tx2=view.getFloat32(off+36,true);}catch(e){continue;}if(!isFinite(rx2)||!isFinite(tx2))continue;var ct=data[off+44],cc=data[off+42]&0x0F,sl=data[off+45]+1,pw=data[off+47]&1?'High':'Low';var rxOk=rx2>=108&&rx2<=870,txOk=tx2>=108&&tx2<=870;chs.push({num:chs.length+1,name:nm,band:_pBand(rxOk?rx2:400),rx:rxOk?Math.round(rx2*100000)/100000:rx2,tx:txOk?Math.round(tx2*100000)/100000:tx2,duplex:rxOk&&txOk?_pOfs(rx2.toFixed(5),tx2.toFixed(5)):'--',tone_rx:'None',tone_tx:'None',power:pw,rx_only:'No',notes:ct===0x30?'DMR CC='+cc+' TS'+sl:'FM'});}
+  return{radio:model+' ['+ver.trim()+']',cps_version:'Browser[DM-32]',zone:'',parsed:new Date().toISOString().slice(0,10),channels:chs};
+}
+
+function _pIMG(text){
+  var lines=text.split(/\r?\n/).filter(function(l){return l.trim();});if(!lines.length)return null;
+  var hdr=lines[0].toLowerCase();if(hdr.indexOf('location')<0&&hdr.indexOf('frequency')<0)return null;
+  var cols=lines[0].split(',').map(function(c){return c.trim().toLowerCase();});
+  function g(row,k){var i=cols.indexOf(k);return i>=0?(row[i]||'').trim():'';}
+  var chs=[];
+  for(var i=1;i<lines.length;i++){var p=lines[i].split(',');if(p.length<3)continue;var freq=g(p,'frequency')||g(p,'freq');if(!freq)continue;var nm=g(p,'name')||'CH'+i,dup=(g(p,'duplex')||'').toLowerCase(),ofs=parseFloat(g(p,'offset'))||0;var rx3=parseFloat(freq)||0,tx3=dup==='+'?rx3+ofs:dup==='-'?rx3-ofs:rx3;var tone=g(p,'tone')||g(p,'tone mode')||'',rt=g(p,'rtonefreq')||'',ct=g(p,'ctonefreq')||rt,dt=g(p,'dtcscode')||'';var tv='None';var tl=tone.toLowerCase();if(tl.indexOf('tsql')>=0||tl.indexOf('tone')>=0)tv=ct||'None';else if(tl.indexOf('dtcs')>=0||tl.indexOf('dcs')>=0)tv='D'+(dt||'023');chs.push({num:i,name:nm,band:_pBand(rx3),rx:rx3,tx:Math.round(tx3*1000000)/1000000,duplex:_pOfs(rx3,tx3),tone_rx:tv,tone_tx:tv,power:'High',rx_only:'No',notes:''});}
+  return{radio:'CHIRP Import',cps_version:'Browser[IMG]',zone:'CHIRP',parsed:new Date().toISOString().slice(0,10),channels:chs};
+}
+
+renderUserList();
+</script>
+</body>
+</html>
